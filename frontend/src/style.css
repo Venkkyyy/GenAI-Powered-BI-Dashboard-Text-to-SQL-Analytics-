@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* ── Queryline Design System ── */
+:root {
+  --bg-deep:         #0A0E14;
+  --surface:         #12161F;
+  --surface-raised:  #171C27;
+  --border-hairline: #232A38;
+  --text-primary:    #E9EDF4;
+  --text-muted:      #7C8698;
+  --accent-amber:    #FFB454;
+  --accent-cool:     #5EA8FF;
+
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Blinking amber block cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.cursor-blink {
+  display: inline-block;
+  width: 9px;
+  height: 1.1em;
+  background-color: var(--accent-amber);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-blink { animation: none; opacity: 1; }
+}
