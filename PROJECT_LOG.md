@@ -67,3 +67,32 @@
   4. Commit Step 1 files, then signal ready for **Step 2**: Schema introspection + LLM integration.
 
 ---
+
+### [STEP 2] — Schema introspection + Groq/Gemini LLM integration
+**Date:** 2026-08-29
+**Status:** ✅ Complete
+
+#### What was built
+- `/backend/src/services/schemaService.js` — Queries `information_schema` for the 4 allowed tables. Formats schema into a concise DDL-like string for the LLM. Builds an `allowedColumns` map (table → Set<column>) for the validation layer. In-memory cache with 5-minute TTL. `refreshSchema()` for on-demand cache busting.
+- `/backend/src/services/promptBuilder.js` — System prompt with: role, formatted schema, 5 hard rules (SELECT-only, allow-list, LIMIT required, no semicolons, ISO dates), 5 diverse few-shot NL→SQL examples (revenue, time-series, geographic, category, customer). Response format enforces strict JSON `{sql, explanation}`.
+- `/backend/src/services/llmService.js` — Groq SDK (primary, llama-3.3-70b-versatile) + Google Gemini SDK (fallback, gemini-1.5-flash). JSON mode enabled on both. Defensive JSON parser strips markdown fences and validates `sql` field. Falls back to Gemini on any Groq error (especially 429).
+- `/backend/src/routes/query.js` — `POST /api/query` (Step 2 version): validates input, fetches schema, builds prompt, calls LLM, logs to in-memory history. Returns `{ id, sql, explanation, provider, data: null, chartType: null }`. `data` and `chartType` will be populated in Step 4.
+- `/backend/src/routes/schema.js` — `GET /api/schema` returns cached schema + `?refresh=1` for force-refresh.
+- `/backend/src/index.js` — Removed 501 stubs; mounted real `queryRouter` and `schemaRouter`. Added real `GET /api/history` and `POST /api/feedback` (in-memory).
+
+#### Key decisions
+- Groq `response_format: { type: "json_object" }` + Gemini `responseMimeType: "application/json"` enforce structured output — reduces hallucination risk significantly.
+- Temperature 0.1 on both providers for deterministic SQL.
+- The `allowedColumns` map built in schemaService is already structured for the Step 3 validator — no refactor needed.
+- `parseResponse()` defensively strips markdown code fences even with JSON mode active.
+- Groq fallback triggers on ANY Groq error (not just 429) so the app degrades gracefully.
+
+#### Verified by
+- `node --check` passes on all 6 new/modified files — zero syntax errors.
+- Server starts cleanly with `npm run dev`.
+- With real API keys in `.env`, `POST /api/query {"question":"top 5 products by revenue"}` returns a valid SELECT statement.
+
+#### Next
+- **Step 3:** SQL validation layer with unit tests — AST parsing via `node-sql-parser`, allow-list enforcement, auto-LIMIT injection, injection attack tests.
+
+---

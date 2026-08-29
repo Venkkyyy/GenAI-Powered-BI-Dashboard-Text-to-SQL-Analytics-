@@ -8,6 +8,8 @@ const express = require("express");
 const cors = require("cors");
 
 const healthRouter = require("./routes/health");
+const queryRouter  = require("./routes/query");
+const schemaRouter = require("./routes/schema");
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -34,16 +36,27 @@ if (process.env.NODE_ENV !== "production") {
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
-app.use("/api/health", healthRouter);
+app.use("/api/health",  healthRouter);
+app.use("/api/query",   queryRouter);
+app.use("/api/schema",  schemaRouter);
 
-// Stubs for future steps — returns 501 so the frontend knows they're not wired yet
-const stub = (name) => (_req, res) =>
-  res.status(501).json({ error: `${name} not implemented yet` });
+// History — reads from the in-memory store in query.js
+app.get("/api/history", (req, res) => {
+  const history = queryRouter.getHistory();
+  const limit = Math.min(parseInt(req.query.limit ?? "20", 10), 100);
+  res.json({ history: history.slice(-limit).reverse() });
+});
 
-app.post("/api/query", stub("POST /api/query"));
-app.get("/api/schema", stub("GET /api/schema"));
-app.get("/api/history", stub("GET /api/history"));
-app.post("/api/feedback", stub("POST /api/feedback"));
+// Feedback — stores thumbs up/down against a query id (Step 7 will persist to DB)
+const _feedback = {};
+app.post("/api/feedback", (req, res) => {
+  const { id, vote } = req.body;
+  if (!id || !["up", "down"].includes(vote)) {
+    return res.status(400).json({ error: "Body must include 'id' and vote: 'up'|'down'" });
+  }
+  _feedback[id] = vote;
+  res.json({ ok: true, id, vote });
+});
 
 // 404 catch-all
 app.use((_req, res) => {
