@@ -86,7 +86,7 @@ function parseResponse(text) {
  */
 async function callGroq(systemPrompt, userMessage) {
   const client = getGroqClient();
-  const model = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
   console.log(`[llm] Calling Groq (${model})...`);
 
@@ -117,7 +117,7 @@ async function callGroq(systemPrompt, userMessage) {
  */
 async function callGemini(systemPrompt, userMessage) {
   const genAI = getGeminiClient();
-  const modelName = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
   console.log(`[llm] Calling Gemini (${modelName})...`);
 
