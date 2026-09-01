@@ -37,6 +37,22 @@ export default function ResultCard({ result, index }) {
     } catch {}
   }
 
+  function exportCSV() {
+    if (!result.data || result.data.length === 0) return;
+    const cols = Object.keys(result.data[0]);
+    const csvRows = [
+      cols.join(','),
+      ...result.data.map(row => cols.map(c => JSON.stringify(row[c] ?? '')).join(','))
+    ];
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `queryline_results_${result.id || 'export'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Calculate Quick Metric Summary
   const summaryKpi = useMemo(() => {
     if (!result.data || result.data.length === 0) return null;
@@ -255,13 +271,42 @@ export default function ResultCard({ result, index }) {
           justifyContent: 'space-between',
           borderTop: '1px solid #f1f5f9',
           paddingTop: '0.75rem',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
         }}>
-          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-            {result.rowCount ?? (result.data?.length || 0)} records returned
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+              {result.rowCount ?? (result.data?.length || 0)} records returned
+            </span>
+
+            {hasData && (
+              <button
+                onClick={exportCSV}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  padding: '2px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; e.currentTarget.style.color = '#4f46e5'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                title="Download query results as CSV"
+              >
+                <span>📥 Export CSV</span>
+              </button>
+            )}
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Was this SQL accurate?</span>
+            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Accurate SQL?</span>
             <button
               onClick={() => submitFeedback('up')}
               title="Yes, accurate SQL"
@@ -273,6 +318,7 @@ export default function ResultCard({ result, index }) {
                 color: vote === 'up' ? '#4f46e5' : '#64748b',
                 fontSize: '0.75rem',
                 cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               👍 Yes
@@ -288,6 +334,7 @@ export default function ResultCard({ result, index }) {
                 color: vote === 'down' ? '#e11d48' : '#64748b',
                 fontSize: '0.75rem',
                 cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               👎 No

@@ -2,21 +2,22 @@
  * App.jsx
  *
  * Queryline — Antigravity BI Dashboard.
- * Includes Antigravity top navigation, dynamic particle background,
- * hero welcome state, drag-and-drop CSV integration, and interactive chart readout cards.
+ * Includes Antigravity top navigation, ambient mesh glow, interactive schema modal,
+ * hero welcome state, tag filters, and interactive line-by-line SQL solution cards.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import InputBar from './components/InputBar';
 import ResultCard from './components/ResultCard';
+import SchemaModal from './components/SchemaModal';
 
 const DEMO_SUGGESTIONS = [
-  { label: "Top 5 products by revenue", icon: "🏆", q: "top 5 products by revenue", tag: "Revenue" },
-  { label: "Monthly revenue trend", icon: "📈", q: "monthly revenue trend", tag: "Trend" },
-  { label: "Orders distribution by country", icon: "🌍", q: "orders by country", tag: "Geographic" },
-  { label: "Customers by loyalty tier", icon: "⭐", q: "customers by loyalty tier", tag: "Segmentation" },
-  { label: "Average order value by category", icon: "💰", q: "average order value by product category", tag: "Metrics" },
-  { label: "Products low in stock inventory", icon: "📦", q: "products with lowest stock", tag: "Inventory" },
+  { label: "Top 5 products by revenue", icon: "🏆", q: "top 5 products by revenue", tag: "Revenue", cat: "revenue" },
+  { label: "Monthly revenue trend", icon: "📈", q: "monthly revenue trend", tag: "Trend", cat: "trends" },
+  { label: "Orders distribution by country", icon: "🌍", q: "orders by country", tag: "Geographic", cat: "geo" },
+  { label: "Customers by loyalty tier", icon: "⭐", q: "customers by loyalty tier", tag: "Customer", cat: "customers" },
+  { label: "Average order value by category", icon: "💰", q: "average order value by product category", tag: "Metrics", cat: "revenue" },
+  { label: "Products low in stock inventory", icon: "📦", q: "products with lowest stock", tag: "Inventory", cat: "inventory" },
 ];
 
 export default function App() {
@@ -26,6 +27,8 @@ export default function App() {
   const [error, setError] = useState(null);
   const [counter, setCounter] = useState(0);
   const [dataset, setDataset] = useState(null);
+  const [isSchemaOpen, setIsSchemaOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('all');
   const bottomRef = useRef(null);
 
   /* ── Submit question ────────────────────────────────────────────────────── */
@@ -91,10 +94,23 @@ export default function App() {
     setCounter(0);
   }
 
+  const filteredSuggestions = useMemo(() => {
+    if (activeCategory === 'all') return DEMO_SUGGESTIONS;
+    return DEMO_SUGGESTIONS.filter(s => s.cat === activeCategory);
+  }, [activeCategory]);
+
   const isEmpty = results.length === 0 && !loading;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-canvas)' }}>
+      {/* ── Schema Explorer Modal ──────────────────────────────────────────── */}
+      <SchemaModal
+        isOpen={isSchemaOpen}
+        onClose={() => setIsSchemaOpen(false)}
+        dataset={dataset}
+        onSelectQuery={submitQuestion}
+      />
+
       {/* ── Sidebar ────────────────────────────────────────────────────────── */}
       <Sidebar
         history={results.map(r => ({ id: r.id, question: r.question, askedAt: r.askedAt }))}
@@ -121,7 +137,7 @@ export default function App() {
         {/* ── Queryline Top Bar ────────────────────────────────────────────── */}
         <header
           style={{
-            height: 60,
+            height: 62,
             borderBottom: '1px solid #f1f5f9',
             background: 'rgba(255, 255, 255, 0.92)',
             backdropFilter: 'blur(12px)',
@@ -134,39 +150,71 @@ export default function App() {
             zIndex: 40,
           }}
         >
-          {/* Active Data Source Status */}
+          {/* Active Data Source Status & Schema Explorer Trigger */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{
+            <button
+              onClick={() => setIsSchemaOpen(true)}
+              style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 5,
+                gap: 6,
                 background: dataset ? '#eff6ff' : '#f0fdf4',
                 border: `1px solid ${dataset ? '#bfdbfe' : '#bbf7d0'}`,
                 color: dataset ? '#1d4ed8' : '#15803d',
                 fontSize: '0.75rem',
                 fontWeight: 600,
-                padding: '3px 10px',
+                padding: '4px 12px',
                 borderRadius: 999,
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dataset ? '#2563eb' : '#16a34a', display: 'inline-block' }} />
-                {dataset ? `Custom File: ${dataset.tableName}` : 'Supabase PostgreSQL (Live)'}
-              </span>
-            </div>
+                cursor: 'pointer',
+                transition: 'all 120ms ease',
+              }}
+              title="Click to view database tables and schema"
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: dataset ? '#2563eb' : '#16a34a', display: 'inline-block' }} />
+              <span>{dataset ? `File: ${dataset.tableName}` : 'PostgreSQL Live'}</span>
+              <span style={{ opacity: 0.6 }}>▾</span>
+            </button>
 
-            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-              {dataset ? `${dataset.rowCount.toLocaleString()} rows · ${dataset.columns.length} columns` : '4 tables introspected · AST Guard active'}
-            </span>
+            <button
+              onClick={() => setIsSchemaOpen(true)}
+              style={{
+                fontSize: '0.76rem',
+                color: '#64748b',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span>🗄️</span>
+              <span style={{ textDecoration: 'underline' }}>
+                {dataset ? `${dataset.columns.length} columns (Inspect Schema)` : '4 Tables Introspected · Inspect'}
+              </span>
+            </button>
           </div>
 
           {/* Right Action */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{
+              fontSize: '0.72rem',
+              color: '#475569',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '3px 8px',
+              borderRadius: 6,
+              fontWeight: 500,
+              fontFamily: 'var(--font-mono)'
+            }}>
+              Gemini 3.7 Flash Active
+            </span>
             <button
               className="btn-antigravity"
               style={{ padding: '0.45rem 1.1rem', fontSize: '0.78rem' }}
               onClick={() => submitQuestion('top 5 products by revenue')}
             >
-              <span>⚡ Run Sample Query</span>
+              <span>⚡ Quick Query</span>
             </button>
           </div>
         </header>
@@ -179,8 +227,12 @@ export default function App() {
             maxWidth: 1200,
             width: '100%',
             margin: '0 auto',
+            position: 'relative',
           }}
         >
+          {/* Ambient Glow Aura */}
+          {isEmpty && <div className="ambient-glow" />}
+
           {/* ── Hero Welcome Screen (when empty) ─────────────────────────── */}
           {isEmpty && (
             <div
@@ -189,34 +241,36 @@ export default function App() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 textAlign: 'center',
-                padding: '3rem 1rem 1rem',
+                padding: '2rem 1rem 1rem',
                 gap: '2rem',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
-              {/* Product Feature Badge */}
+              {/* Feature Pill Badge */}
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
-                background: '#f8fafc',
+                background: '#ffffff',
                 border: '1px solid #e2e8f0',
-                padding: '0.4rem 1rem',
+                padding: '0.4rem 1.1rem',
                 borderRadius: 9999,
                 fontSize: '0.78rem',
                 fontWeight: 600,
-                color: '#475569',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                color: '#334155',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
               }}>
                 <span style={{ color: '#4f46e5' }}>✦</span>
-                <span>GenAI-Powered Text-to-SQL Business Intelligence</span>
+                <span>Next-Gen Agentic Text-to-SQL Analytics</span>
               </div>
 
               {/* Hero Heading */}
-              <div style={{ maxWidth: 780 }}>
+              <div style={{ maxWidth: 800 }}>
                 <h1
                   style={{
                     fontFamily: 'var(--font-heading)',
-                    fontSize: '3rem',
+                    fontSize: '3.1rem',
                     fontWeight: 800,
                     letterSpacing: '-0.03em',
                     lineHeight: 1.15,
@@ -231,13 +285,13 @@ export default function App() {
                     fontSize: '1.08rem',
                     color: '#475569',
                     lineHeight: 1.6,
-                    maxWidth: 620,
+                    maxWidth: 640,
                     margin: '0 auto',
                   }}
                 >
                   {dataset
-                    ? `Dataset "${dataset.tableName}" is loaded and ready. Ask any business question to generate SQL and visual readouts instantly.`
-                    : 'Ask plain-English business questions. Queryline generates AST-validated SQL against your live database schema and charts the answers instantly.'
+                    ? `Dataset "${dataset.tableName}" (${dataset.rowCount.toLocaleString()} rows) is ready. Ask questions in natural English to generate line-by-line SQL and live charts.`
+                    : 'Ask plain-English business questions. Queryline generates AST-validated SQL against your live PostgreSQL database and charts the answers instantly.'
                   }
                 </p>
               </div>
@@ -253,17 +307,75 @@ export default function App() {
                 <button
                   className="btn-ghost-pill"
                   style={{ padding: '0.65rem 1.3rem', fontSize: '0.875rem', fontWeight: 600 }}
-                  onClick={() => submitQuestion('monthly revenue trend')}
+                  onClick={() => setIsSchemaOpen(true)}
                 >
-                  <span>📈 Monthly Revenue Trend</span>
+                  <span>🗄️ Inspect Schema & Tables</span>
                 </button>
               </div>
 
-              {/* Suggestion Cards Grid */}
-              <div style={{ marginTop: '1.5rem', width: '100%', maxWidth: 880 }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
-                  Recommended Questions
-                </p>
+              {/* Stat Tickers Strip */}
+              <div style={{
+                display: 'flex',
+                gap: '1.5rem',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                padding: '0.75rem 1.5rem',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 14,
+                fontSize: '0.78rem',
+                color: '#475569',
+                fontWeight: 500,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🔒</span>
+                  <span>100% AST Safety Guard</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>⚡</span>
+                  <span>Sub-120ms Query Execution</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📈</span>
+                  <span>Multi-Mode Interactive Charts</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>💻</span>
+                  <span>Line-by-Line IDE Output</span>
+                </div>
+              </div>
+
+              {/* Suggestion Cards Section */}
+              <div style={{ marginTop: '0.5rem', width: '100%', maxWidth: 900 }}>
+                {/* Category Filters */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: '1.25rem' }}>
+                  {[
+                    { id: 'all', label: 'All Queries' },
+                    { id: 'revenue', label: '💰 Revenue' },
+                    { id: 'trends', label: '📈 Trends' },
+                    { id: 'geo', label: '🌍 Regions' },
+                    { id: 'customers', label: '👥 Customers' },
+                    { id: 'inventory', label: '📦 Inventory' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveCategory(tab.id)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                        fontSize: '0.75rem',
+                        fontWeight: activeCategory === tab.id ? 700 : 500,
+                        background: activeCategory === tab.id ? '#09090b' : '#f8fafc',
+                        color: activeCategory === tab.id ? '#ffffff' : '#64748b',
+                        border: `1px solid ${activeCategory === tab.id ? '#09090b' : '#e2e8f0'}`,
+                        cursor: 'pointer',
+                        transition: 'all 120ms ease',
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
                 <div
                   style={{
@@ -272,7 +384,7 @@ export default function App() {
                     gap: '0.85rem',
                   }}
                 >
-                  {DEMO_SUGGESTIONS.map(s => (
+                  {filteredSuggestions.map(s => (
                     <button
                       key={s.label}
                       onClick={() => submitQuestion(s.q)}
@@ -321,7 +433,7 @@ export default function App() {
             <div
               className="card-enter"
               style={{
-                maxWidth: 840,
+                maxWidth: 960,
                 margin: '0 auto 1.5rem',
                 padding: '0.85rem 1.25rem',
                 background: '#fff1f2',
