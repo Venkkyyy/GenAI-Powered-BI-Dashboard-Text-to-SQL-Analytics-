@@ -63,10 +63,13 @@ app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-// Global error handler
+// Global error handler — shows real message in dev, generic in prod
 app.use((err, _req, res, _next) => {
-  console.error("[server] Unhandled error:", err);
-  res.status(500).json({ error: "Internal server error" });
+  console.error("[server] Unhandled error:", err.message ?? err);
+  const isDev = process.env.NODE_ENV !== "production";
+  res.status(500).json({
+    error: isDev ? err.message ?? "Internal server error" : "Internal server error",
+  });
 });
 
 // ── Start ────────────────────────────────────────────────────────────────────

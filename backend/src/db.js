@@ -39,7 +39,7 @@ async function query(text, params) {
     }
     return result;
   } catch (err) {
-    console.error("[db] query error:", err.message, "\nSQL:", text);
+    console.error("[db] query error:", err, "\nSQL:", text);
     throw err;
   }
 }
