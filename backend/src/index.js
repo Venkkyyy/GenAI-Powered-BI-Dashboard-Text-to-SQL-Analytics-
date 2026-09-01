@@ -7,9 +7,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-const healthRouter = require("./routes/health");
-const queryRouter  = require("./routes/query");
-const schemaRouter = require("./routes/schema");
+const healthRouter  = require("./routes/health");
+const queryRouter   = require("./routes/query");
+const schemaRouter  = require("./routes/schema");
+const uploadRouter  = require("./routes/upload");
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -19,10 +20,11 @@ const PORT = process.env.PORT ?? 3001;
 app.use(
   cors({
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -39,6 +41,7 @@ if (process.env.NODE_ENV !== "production") {
 app.use("/api/health",  healthRouter);
 app.use("/api/query",   queryRouter);
 app.use("/api/schema",  schemaRouter);
+app.use("/api/upload",  uploadRouter);
 
 // History — reads from the in-memory store in query.js
 app.get("/api/history", (req, res) => {

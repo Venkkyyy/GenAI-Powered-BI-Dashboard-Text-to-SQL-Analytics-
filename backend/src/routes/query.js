@@ -1,23 +1,11 @@
 /**
  * routes/query.js — POST /api/query
  *
- * Step 2+3+4 implementation:
- *  2. LLM generates SQL from the user's natural-language question.
- *  3. sqlValidator validates & sanitizes the generated SQL (AST-level).
- *  4. Validated SQL is executed against the Supabase DB; results are shaped
- *     and a chart type is auto-selected by chartAdvisor.
+ * Dual-mode execution:
+ *  - If a CSV has been uploaded → uses alasql (in-memory SQL engine) on that dataset.
+ *  - Otherwise → uses the live Supabase DB via schemaService.
  *
- * Response shape:
- *  {
- *    id, question, sql, explanation, provider,
- *    data: Row[],
- *    chartType: "bar"|"time_series"|"pie"|"scatter"|"table",
- *    columnMap: { xAxis, yAxis, label, value },
- *    warnings: string[],
- *    rowCount: number,
- *    executionMs: number,
- *    askedAt: ISO string
- *  }
+ * Pipeline: LLM → sqlValidator → alasql|pg → chartAdvisor → respond
  */
 
 const express = require("express");
@@ -26,6 +14,8 @@ const { buildSystemPrompt, buildUserMessage } = require("../services/promptBuild
 const { generateSQL } = require("../services/llmService");
 const { validateSQL } = require("../services/sqlValidator");
 const { selectChartType } = require("../services/chartAdvisor");
+const { getDataset, formatDatasetSchema } = require("../services/datasetStore");
+const alasql = require("alasql");
 const db = require("../db");
 
 const router = express.Router();
@@ -52,60 +42,80 @@ router.post("/", async (req, res, next) => {
   console.log(`[query] Question: "${trimmed}"`);
 
   try {
-    // ── Step 2a: Fetch live schema ─────────────────────────────────────────────
-    const schema = await getSchema();
+    // ── Determine data source mode ─────────────────────────────────────────────
+    const dataset = getDataset();
+    const useDataset = !!dataset;
 
-    // ── Step 2b: Build prompt + call LLM ──────────────────────────────────────
-    const systemPrompt = buildSystemPrompt(schema.formatted);
-    const userMessage = buildUserMessage(trimmed);
+    // ── Build schema context for LLM ──────────────────────────────────────────
+    let schemaFormatted, allowList;
+    if (useDataset) {
+      // Dataset mode: use uploaded CSV schema
+      console.log(`[query] Mode: dataset (${dataset.name}, ${dataset.rows.length} rows)`);
+      schemaFormatted = formatDatasetSchema(dataset);
+      allowList = {
+        tables: [dataset.name],
+        columns: new Map([[
+          dataset.name,
+          new Set(dataset.columns.map(c => c.name)),
+        ]]),
+      };
+    } else {
+      // DB mode: use live Supabase schema
+      console.log(`[query] Mode: database (Supabase)`);
+      const schema = await getSchema();
+      schemaFormatted = schema.formatted;
+      allowList = { tables: schema.tables, columns: schema.columns };
+    }
+
+    // ── LLM: generate SQL ──────────────────────────────────────────────────────
+    const systemPrompt = buildSystemPrompt(schemaFormatted);
+    const userMessage  = buildUserMessage(trimmed);
     const { sql: rawSql, explanation, provider } = await generateSQL(systemPrompt, userMessage);
-
     console.log(`[query] LLM (${provider}) generated SQL: ${rawSql}`);
 
-    // ── Step 3: Validate & sanitize SQL ───────────────────────────────────────
+    // ── Step 3: Validate SQL ───────────────────────────────────────────────────
     let validatedSql, warnings;
     try {
-      ({ sql: validatedSql, warnings } = validateSQL(rawSql, {
-        tables: schema.tables,
-        columns: schema.columns,
-      }));
+      ({ sql: validatedSql, warnings } = validateSQL(rawSql, allowList));
     } catch (validationErr) {
-      console.warn(`[query] SQL validation rejected query: ${validationErr.message}`);
+      console.warn(`[query] Validation rejected: ${validationErr.message}`);
       return res.status(422).json({
         error: "The generated SQL failed safety validation.",
         reason: validationErr.message,
         sql: rawSql,
       });
     }
-
-    if (warnings.length > 0) {
-      console.warn(`[query] SQL validation warnings:`, warnings);
-    }
-
+    if (warnings.length > 0) console.warn(`[query] Validation warnings:`, warnings);
     console.log(`[query] Validated SQL: ${validatedSql}`);
 
-    // ── Step 4a: Execute against the database ──────────────────────────────────
+    // ── Step 4a: Execute ───────────────────────────────────────────────────────
     const execStart = Date.now();
     let rows;
     try {
-      const result = await db.query(validatedSql);
-      rows = result.rows;
-    } catch (dbErr) {
-      console.error(`[query] DB execution error: ${dbErr.message}`);
+      if (useDataset) {
+        // alasql: register dataset rows as a temp table and run the query
+        alasql.tables[dataset.name] = { data: dataset.rows };
+        rows = alasql(validatedSql);
+        if (!Array.isArray(rows)) rows = [];
+      } else {
+        const result = await db.query(validatedSql);
+        rows = result.rows;
+      }
+    } catch (execErr) {
+      console.error(`[query] Execution error: ${execErr.message}`);
       return res.status(422).json({
-        error: "SQL execution failed.",
-        reason: dbErr.message,
+        error: useDataset ? "Query execution failed on the uploaded dataset." : "SQL execution failed.",
+        reason: execErr.message,
         sql: validatedSql,
       });
     }
     const executionMs = Date.now() - execStart;
+    console.log(`[query] Executed in ${executionMs}ms — ${rows.length} rows`);
 
-    console.log(`[query] Executed in ${executionMs}ms — ${rows.length} rows returned`);
-
-    // ── Step 4b: Auto-select chart type ───────────────────────────────────────
+    // ── Step 4b: Chart selection ───────────────────────────────────────────────
     const { chartType, columnMap } = selectChartType(rows);
-
     console.log(`[query] Auto-selected chart: ${chartType}`);
+
 
     // ── Log to history ─────────────────────────────────────────────────────────
     const entry = {

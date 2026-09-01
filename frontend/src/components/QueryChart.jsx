@@ -12,22 +12,22 @@ import {
   ScatterChart, Scatter,
 } from 'recharts';
 
-const AMBER = '#FFB454';
-const COOL  = '#8ab4f8';
-const CHART_COLORS = ['#FFB454', '#8ab4f8', '#c58af9', '#81c995', '#f87171', '#e8a960'];
+const AMBER = '#f29900';
+const COOL  = '#1a73e8';
+const CHART_COLORS = ['#f29900', '#1a73e8', '#7c4dff', '#1e8e3e', '#d93025', '#e8a960'];
 
 const tooltipStyle = {
-  backgroundColor: 'rgba(18,18,24,0.95)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  backgroundColor: '#fff',
+  border: '1px solid #e0e0e0',
   borderRadius: 8,
-  color: '#e8eaed',
+  color: '#202124',
   fontFamily: "'Google Sans Mono', 'Courier New', monospace",
   fontSize: '0.72rem',
-  backdropFilter: 'blur(8px)',
+  boxShadow: '0 4px 16px rgba(60,64,67,0.14)',
 };
 
 const axisStyle = {
-  fill: '#5f6368',
+  fill: '#9aa0a6',
   fontFamily: "'Google Sans Mono', monospace",
   fontSize: 10.5,
 };
@@ -128,16 +128,17 @@ function TableView({ data }) {
   const cols = Object.keys(data[0]);
   const tableStyle = {
     width: '100%', borderCollapse: 'collapse',
-    fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.75rem',
+    fontFamily: "'Google Sans Mono', monospace", fontSize: '0.72rem',
   };
   const thStyle = {
-    textAlign: 'left', padding: '6px 10px',
-    color: '#7C8698', borderBottom: '1px solid #232A38',
-    fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em',
+    textAlign: 'left', padding: '7px 10px',
+    color: '#5f6368', borderBottom: '1px solid #e0e0e0',
+    fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
+    fontSize: '0.62rem',
   };
   const tdStyle = {
-    padding: '6px 10px', color: '#E9EDF4',
-    borderBottom: '1px solid #1a1f2b',
+    padding: '6px 10px', color: '#202124',
+    borderBottom: '1px solid #f1f3f4',
   };
   return (
     <div style={{ overflowX: 'auto', maxHeight: 260, overflowY: 'auto', marginTop: 4 }}>
@@ -147,7 +148,7 @@ function TableView({ data }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : '#0d1018' }}>
+            <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
               {cols.map(c => <td key={c} style={tdStyle}>{row[c] ?? '—'}</td>)}
             </tr>
           ))}
@@ -161,7 +162,7 @@ function TableView({ data }) {
 export default function QueryChart({ chartType, data, columnMap }) {
   if (!data || data.length === 0) {
     return (
-      <p style={{ color: '#7C8698', fontFamily: "'IBM Plex Mono',monospace", fontSize: '0.8rem', padding: '1rem 0' }}>
+      <p style={{ color: '#9aa0a6', fontFamily: "'Google Sans Mono',monospace", fontSize: '0.78rem', padding: '1rem 0' }}>
         No rows returned.
       </p>
     );

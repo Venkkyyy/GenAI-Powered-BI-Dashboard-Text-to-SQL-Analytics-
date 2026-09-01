@@ -1,31 +1,22 @@
 /**
- * App.jsx — Queryline v2 (Gemini-style layout)
+ * App.jsx  v3 — Light theme with CSV upload support
  *
- * ┌───────────────────────────────────────────────────┐
- * │  Sidebar (fixed left, 260px)                      │
- * │  ┌─────────────────────────────────────────────┐  │
- * │  │  Main scrollable content area               │  │
- * │  │  ┌───────────────────────────────────────┐  │  │
- * │  │  │  Empty / Result cards (2-col grid)    │  │  │
- * │  │  └───────────────────────────────────────┘  │  │
- * │  │  ┌───────────────────────────────────────┐  │  │
- * │  │  │  Bottom Input Bar (fixed)             │  │  │
- * │  │  └───────────────────────────────────────┘  │  │
- * │  └─────────────────────────────────────────────┘  │
- * └───────────────────────────────────────────────────┘
+ * Modes:
+ *  - No dataset: shows empty state with suggestion grid, queries run on Supabase DB
+ *  - Dataset uploaded: input bar shows dataset badge, queries run on in-memory CSV
  */
 import React, { useCallback, useRef, useState } from 'react';
 import Sidebar    from './components/Sidebar';
 import InputBar   from './components/InputBar';
 import ResultCard from './components/ResultCard';
 
-const SUGGESTIONS_ALL = [
-  { label: "Top 5 products by revenue", icon: "🏆" },
-  { label: "Monthly revenue trend",     icon: "📈" },
-  { label: "Orders by country",         icon: "🌍" },
-  { label: "Customers by loyalty tier", icon: "⭐" },
-  { label: "Avg order value by category", icon: "💰" },
-  { label: "Products low in stock",     icon: "📦" },
+const DEMO_SUGGESTIONS = [
+  { label: "Top 5 products by revenue",      icon: "🏆", q: "top 5 products by revenue" },
+  { label: "Monthly revenue trend",          icon: "📈", q: "monthly revenue trend" },
+  { label: "Orders by country",              icon: "🌍", q: "orders by country" },
+  { label: "Customers by loyalty tier",      icon: "⭐", q: "customers by loyalty tier" },
+  { label: "Average order value by category",icon: "💰", q: "average order value by product category" },
+  { label: "Products low in stock",          icon: "📦", q: "products with lowest stock" },
 ];
 
 export default function App() {
@@ -34,8 +25,10 @@ export default function App() {
   const [lastSQL,  setLastSQL]  = useState(null);
   const [error,    setError]    = useState(null);
   const [counter,  setCounter]  = useState(0);
-  const topRef = useRef(null);
+  const [dataset,  setDataset]  = useState(null);   // uploaded CSV info
+  const gridRef = useRef(null);
 
+  /* ── Submit a question ──────────────────────────────────────────────────── */
   const submitQuestion = useCallback(async (question) => {
     if (loading) return;
     setLoading(true);
@@ -59,15 +52,41 @@ export default function App() {
       setLastSQL(json.sql);
       const id = counter + 1;
       setCounter(id);
-      setResults(prev => [{ ...json, id, askedAt: json.askedAt ?? new Date().toISOString() }, ...prev]);
-      setTimeout(() => topRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      const entry = {
+        ...json,
+        id,
+        askedAt: json.askedAt ?? new Date().toISOString(),
+        dataSource: dataset ? 'dataset' : 'database',
+      };
+      setResults(prev => [entry, ...prev]);
+
+      setTimeout(() => gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     } catch {
       setError('Connection error — is the backend running on port 3001?');
     } finally {
       setLoading(false);
     }
-  }, [loading, counter]);
+  }, [loading, counter, dataset]);
 
+  /* ── Upload CSV ─────────────────────────────────────────────────────────── */
+  function handleUpload(uploadData) {
+    setDataset(uploadData);
+    setError(null);
+    setResults([]);
+    setLastSQL(null);
+    setCounter(0);
+  }
+
+  /* ── Clear dataset ──────────────────────────────────────────────────────── */
+  async function handleClearDataset() {
+    try { await fetch('/api/upload', { method: 'DELETE' }); } catch {}
+    setDataset(null);
+    setResults([]);
+    setLastSQL(null);
+    setCounter(0);
+  }
+
+  /* ── New query ──────────────────────────────────────────────────────────── */
   function clearAll() {
     setResults([]);
     setLastSQL(null);
@@ -78,149 +97,192 @@ export default function App() {
   const isEmpty = results.length === 0 && !loading;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
 
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
       <Sidebar
         history={results.map(r => ({ id: r.id, question: r.question, askedAt: r.askedAt }))}
+        dataset={dataset}
         onNew={clearAll}
         onSelect={submitQuestion}
+        onUpload={handleUpload}
+        onClearDataset={handleClearDataset}
       />
 
-      {/* ── Main area ───────────────────────────────────────────────────── */}
+      {/* ── Main content ───────────────────────────────────────────────────── */}
       <div className="main-content" style={{
-        marginLeft: 260,
-        flex: 1,
+        marginLeft: 280, flex: 1,
         minHeight: '100vh',
-        paddingBottom: 220, // space for input bar
-        paddingTop: '2rem',
+        paddingBottom: 240,
+        paddingTop: '2.5rem',
         paddingLeft: '2rem',
         paddingRight: '2rem',
-        maxWidth: '100%',
-        position: 'relative',
       }}>
 
-        {/* ── Empty state ─────────────────────────────────────────────── */}
+        {/* ── Empty state ────────────────────────────────────────────────── */}
         {isEmpty && (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', minHeight: 'calc(100vh - 260px)',
-            gap: '2rem', textAlign: 'center',
+            justifyContent: 'center',
+            minHeight: 'calc(100vh - 260px)',
+            gap: '2.5rem', textAlign: 'center',
           }}>
-            {/* Logo mark */}
-            <div style={{
-              width: 64, height: 64, borderRadius: 20,
-              background: 'var(--grad-brand)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.8rem', fontWeight: 700,
-              fontFamily: 'var(--font-mono)', color: '#000',
-              boxShadow: 'var(--glow-amber)',
-            }}>Q</div>
+            {/* Logo + headline */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: '#202124',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.5rem', fontWeight: 700,
+                fontFamily: 'var(--font-mono)', color: '#FFB454',
+                boxShadow: '0 4px 16px rgba(32,33,36,0.2)',
+              }}>Q</div>
 
-            <div>
-              <h1 style={{
-                fontSize: '2rem', fontWeight: 600, marginBottom: '0.5rem',
-                background: 'var(--grad-text)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+              <div>
+                <h1 style={{
+                  fontSize: '2.25rem', fontWeight: 700, color: 'var(--text-1)',
+                  letterSpacing: '-0.02em', marginBottom: '0.4rem',
+                }}>
+                  {dataset
+                    ? <>Exploring <span style={{ color: 'var(--amber)' }}>{dataset.tableName}</span></>
+                    : 'What do you want to know?'
+                  }
+                </h1>
+                <p style={{ fontSize: '1rem', color: 'var(--text-2)', maxWidth: 500 }}>
+                  {dataset
+                    ? `${dataset.rowCount.toLocaleString()} rows · ${dataset.columns.length} columns loaded. Ask anything about your data.`
+                    : 'Upload a CSV or ask about the built-in e-commerce demo. Queryline generates SQL and charts the answer instantly.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Upload prompt (when no dataset) */}
+            {!dataset && (
+              <div style={{
+                background: '#fff8e7', border: '1px solid #f9ab00', borderRadius: 12,
+                padding: '0.85rem 1.5rem', maxWidth: 460,
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
               }}>
-                What do you want to know?
-              </h1>
-              <p style={{ color: 'var(--text-2)', fontSize: '0.95rem' }}>
-                Ask a plain-English question — Queryline generates SQL and charts the answer instantly.
-              </p>
-            </div>
+                <span style={{ fontSize: '1.2rem' }}>📂</span>
+                <p style={{ fontSize: '0.82rem', color: '#8a5e00', textAlign: 'left', lineHeight: 1.5 }}>
+                  <strong>Upload your own CSV</strong> from the sidebar to query any dataset — sales, inventory, analytics, anything.
+                </p>
+              </div>
+            )}
 
-            {/* Suggestion grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '0.75rem', width: '100%', maxWidth: 720,
-            }}>
-              {SUGGESTIONS_ALL.map(s => (
-                <button
-                  key={s.label}
-                  onClick={() => submitQuestion(s.label)}
-                  style={{
-                    textAlign: 'left',
-                    background: 'var(--glass)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-lg)',
-                    padding: '0.85rem 1rem',
-                    cursor: 'pointer',
-                    transition: 'all var(--t-mid)',
-                    display: 'flex', flexDirection: 'column', gap: '0.35rem',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'rgba(255,180,84,0.4)';
-                    e.currentTarget.style.background = 'var(--surface-hover)';
-                    e.currentTarget.style.boxShadow = 'var(--glow-amber)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.background = 'var(--glass)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <span style={{ fontSize: '1.1rem' }}>{s.icon}</span>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
-                    {s.label}
+            {/* Suggestion cards */}
+            {!dataset && (
+              <>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', marginTop: -8 }}>Or try the demo data:</p>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '0.65rem', width: '100%', maxWidth: 680,
+                }}>
+                  {DEMO_SUGGESTIONS.map(s => (
+                    <button
+                      key={s.label}
+                      onClick={() => submitQuestion(s.q)}
+                      style={{
+                        textAlign: 'left', background: '#fff',
+                        border: '1px solid var(--border)', borderRadius: 12,
+                        padding: '0.8rem 1rem', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', gap: '0.3rem',
+                        boxShadow: 'var(--shadow-xs)',
+                        transition: 'all 200ms cubic-bezier(0.4,0,0.2,1)',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#f9ab00';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(60,64,67,0.14)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
+                        e.currentTarget.style.transform = 'none';
+                      }}
+                    >
+                      <span style={{ fontSize: '1.1rem' }}>{s.icon}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-1)', fontWeight: 500, lineHeight: 1.4 }}>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Dataset column preview */}
+            {dataset && (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 600,
+              }}>
+                {dataset.columns.slice(0, 12).map(col => (
+                  <span key={col.name} style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '0.7rem',
+                    background: col.type === 'NUMBER' ? '#e8f0fe' : col.type === 'DATE' ? '#e6f4ea' : '#f1f3f4',
+                    color: col.type === 'NUMBER' ? '#1a73e8' : col.type === 'DATE' ? '#1e8e3e' : '#5f6368',
+                    borderRadius: 6, padding: '3px 9px', border: '1px solid',
+                    borderColor: col.type === 'NUMBER' ? '#c5d9f7' : col.type === 'DATE' ? '#c6e8ce' : '#e0e0e0',
+                  }}>
+                    {col.name} <span style={{ opacity: 0.6 }}>{col.type}</span>
                   </span>
-                </button>
-              ))}
-            </div>
+                ))}
+                {dataset.columns.length > 12 && (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', padding: '3px 0' }}>
+                    +{dataset.columns.length - 12} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Error toast ─────────────────────────────────────────────── */}
+        {/* ── Error toast ─────────────────────────────────────────────────── */}
         {error && (
           <div role="alert" className="fade-in" style={{
             maxWidth: 760, margin: '0 auto 1rem',
             padding: '0.75rem 1rem',
-            background: 'rgba(255,100,100,0.08)',
-            border: '1px solid rgba(255,100,100,0.25)',
-            borderRadius: 'var(--r-lg)',
+            background: '#fce8e6', border: '1px solid #f5c6c2',
+            borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
-            fontSize: '0.82rem', color: '#ff8080',
+            fontSize: '0.82rem', color: '#d93025',
           }}>
             <span>⚠ {error}</span>
-            <button
-              onClick={() => setError(null)}
-              style={{ background: 'none', border: 'none', color: '#ff8080', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
-            >✕</button>
+            <button onClick={() => setError(null)}
+              style={{ background: 'none', border: 'none', color: '#d93025', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
           </div>
         )}
 
-        {/* ── Loading skeleton ─────────────────────────────────────────── */}
+        {/* ── Loading skeleton ─────────────────────────────────────────────── */}
         {loading && (
-          <div ref={topRef} style={{
+          <div ref={gridRef} style={{
             maxWidth: 760, margin: '0 auto 1rem',
-            background: 'var(--glass)', backdropFilter: 'blur(12px)',
-            border: '1px solid var(--border)', borderRadius: 'var(--r-xl)',
-            overflow: 'hidden', padding: '1.25rem 1.5rem',
+            background: '#fff', border: '1px solid var(--border)',
+            borderRadius: 20, overflow: 'hidden',
+            boxShadow: 'var(--shadow-sm)',
+            padding: '1rem 1.25rem',
           }}>
-            <div style={{ height: 3, background: 'var(--grad-brand)', marginBottom: '1.25rem', marginLeft: '-1.5rem', marginRight: '-1.5rem', marginTop: '-1.25rem' }} />
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
-              <div className="skeleton" style={{ width: 28, height: 14 }} />
-              <div className="skeleton" style={{ width: 60, height: 14 }} />
+            <div style={{ height: 3, background: '#f1f3f4', marginBottom: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginTop: '-1rem' }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <div className="skeleton" style={{ width: 28, height: 12 }} />
+              <div className="skeleton" style={{ width: 60, height: 12 }} />
             </div>
-            <div className="skeleton" style={{ height: 16, width: '70%', marginBottom: 8 }} />
-            <div className="skeleton" style={{ height: 160, marginBottom: 8 }} />
+            <div className="skeleton" style={{ height: 16, width: '65%', marginBottom: 8 }} />
+            <div className="skeleton" style={{ height: 180, marginBottom: 8 }} />
             <div style={{ display: 'flex', gap: 8 }}>
-              <div className="skeleton" style={{ height: 12, width: '20%' }} />
-              <div className="skeleton" style={{ height: 12, width: '15%' }} />
+              <div className="skeleton" style={{ height: 10, width: '18%' }} />
+              <div className="skeleton" style={{ height: 10, width: '12%' }} />
             </div>
           </div>
         )}
 
-        {/* ── Result cards ──────────────────────────────────────────────── */}
+        {/* ── Result cards ─────────────────────────────────────────────────── */}
         {results.length > 0 && (
           <div style={{
-            maxWidth: 1100, margin: '0 auto',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 500px), 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 520px), 1fr))',
             gap: '1rem',
+            maxWidth: 1120, margin: '0 auto',
           }}>
             {results.map((r, i) => (
               <ResultCard key={r.id ?? i} result={r} index={r.id ?? (results.length - i)} />
@@ -229,12 +291,12 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Bottom input bar ────────────────────────────────────────────── */}
+      {/* ── Bottom input bar ────────────────────────────────────────────────── */}
       <InputBar
         onSubmit={submitQuestion}
         loading={loading}
         lastSQL={lastSQL}
-        onClear={clearAll}
+        dataset={dataset}
       />
     </div>
   );
