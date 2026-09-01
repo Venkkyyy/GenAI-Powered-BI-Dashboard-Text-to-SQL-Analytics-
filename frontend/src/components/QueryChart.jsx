@@ -1,178 +1,325 @@
 /**
  * components/QueryChart.jsx
- * Renders the correct Recharts chart type based on the backend's auto-selection.
- * Supported: bar, time_series, pie, scatter, table
+ *
+ * Professional BI Visualization Engine (Antigravity-inspired).
+ * - Coerces strings to Numbers automatically (handles Postgres NUMERIC/SUM).
+ * - Multi-series support, clean tooltips, interactive legends, gradient fills.
+ * - Supports Bar, Area / Line, Donut / Pie, and Data Table views with tab switching.
  */
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart, Bar,
+  AreaChart, Area,
   LineChart, Line,
   PieChart, Pie, Cell,
-  ScatterChart, Scatter,
+  CartesianGrid, XAxis, YAxis, Tooltip, Legend
 } from 'recharts';
 
-const AMBER = '#f29900';
-const COOL  = '#1a73e8';
-const CHART_COLORS = ['#f29900', '#1a73e8', '#7c4dff', '#1e8e3e', '#d93025', '#e8a960'];
+// Antigravity vibrant palette
+const PALETTE = [
+  '#4f46e5', // Indigo
+  '#06b6d4', // Cyan
+  '#8b5cf6', // Violet
+  '#10b981', // Emerald
+  '#f43f5e', // Rose
+  '#f59e0b', // Amber
+  '#3b82f6', // Blue
+];
 
-const tooltipStyle = {
-  backgroundColor: '#fff',
-  border: '1px solid #e0e0e0',
-  borderRadius: 8,
-  color: '#202124',
-  fontFamily: "'Google Sans Mono', 'Courier New', monospace",
-  fontSize: '0.72rem',
-  boxShadow: '0 4px 16px rgba(60,64,67,0.14)',
+const customTooltipStyle = {
+  backgroundColor: 'rgba(255, 255, 255, 0.96)',
+  border: '1px solid #e2e8f0',
+  borderRadius: 12,
+  padding: '10px 14px',
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+  fontFamily: "'Inter', -apple-system, sans-serif",
+  fontSize: '0.8rem',
+  color: '#0f172a',
+  backdropFilter: 'blur(8px)',
 };
 
-const axisStyle = {
-  fill: '#9aa0a6',
-  fontFamily: "'Google Sans Mono', monospace",
-  fontSize: 10.5,
-};
+function formatValue(v) {
+  if (v == null) return '—';
+  const n = Number(v);
+  if (!isNaN(n)) {
+    if (Math.abs(n) >= 1000000) return `$${(n / 1000000).toFixed(2)}M`;
+    if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(1)}k`;
+    return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+  return String(v);
+}
 
-function truncLabel(v, max = 14) {
-  const s = String(v);
+function truncate(str, max = 16) {
+  if (!str) return '';
+  const s = String(str);
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
-/* ── Bar chart ─────────────────────────────────────────────────────────────── */
-function BarChartView({ data, columnMap }) {
-  const xKey  = columnMap.xAxis ?? Object.keys(data[0])[0];
-  const yKeys = Array.isArray(columnMap.yAxis) ? columnMap.yAxis : [columnMap.yAxis ?? Object.keys(data[0])[1]];
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 40 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#232A38" vertical={false} />
-        <XAxis dataKey={xKey} tick={axisStyle} tickFormatter={truncLabel} angle={-30} textAnchor="end" interval={0} />
-        <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#232A38' }} />
-        {yKeys.length > 1 && <Legend wrapperStyle={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#7C8698' }} />}
-        {yKeys.map((k, i) => (
-          <Bar key={k} dataKey={k} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[3, 3, 0, 0]} maxBarSize={48} />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
+export default function QueryChart({ chartType: defaultType = 'bar', data = [], columnMap = {} }) {
+  const [activeTab, setActiveTab] = useState(
+    defaultType === 'time_series' ? 'area' : defaultType === 'pie' ? 'pie' : 'bar'
   );
-}
 
-/* ── Time-series (line) chart ──────────────────────────────────────────────── */
-function TimeSeriesView({ data, columnMap }) {
-  const xKey  = columnMap.xAxis ?? Object.keys(data[0])[0];
-  const yKeys = Array.isArray(columnMap.yAxis) ? columnMap.yAxis : [columnMap.yAxis ?? Object.keys(data[0])[1]];
-  // Format date labels
-  const formatted = data.map(row => ({
-    ...row,
-    [xKey]: typeof row[xKey] === 'string' ? row[xKey].slice(0, 10) : row[xKey],
-  }));
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <LineChart data={formatted} margin={{ top: 10, right: 16, left: 0, bottom: 40 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#232A38" />
-        <XAxis dataKey={xKey} tick={axisStyle} angle={-30} textAnchor="end" interval="preserveStartEnd" />
-        <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-        <Tooltip contentStyle={tooltipStyle} />
-        {yKeys.length > 1 && <Legend wrapperStyle={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#7C8698' }} />}
-        {yKeys.map((k, i) => (
-          <Line key={k} type="monotone" dataKey={k} stroke={CHART_COLORS[i % CHART_COLORS.length]}
-            strokeWidth={2} dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length] }} activeDot={{ r: 5 }} />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
+  // Normalize data: convert stringified numbers to actual numbers for Recharts
+  const { sanitizedData, xKey, numericKeys, labelKey, valueKey } = useMemo(() => {
+    if (!data || data.length === 0) {
+      return { sanitizedData: [], xKey: 'name', numericKeys: [], labelKey: 'name', valueKey: 'value' };
+    }
 
-/* ── Pie chart ─────────────────────────────────────────────────────────────── */
-function PieChartView({ data, columnMap }) {
-  const labelKey = columnMap.label ?? Object.keys(data[0])[0];
-  const valueKey = columnMap.value ?? Object.keys(data[0])[1];
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <PieChart>
-        <Pie data={data} dataKey={valueKey} nameKey={labelKey}
-          cx="50%" cy="50%" outerRadius={90}
-          labelLine={false}
-          label={({ name, percent }) => `${truncLabel(name, 10)} ${(percent * 100).toFixed(0)}%`}
-        >
-          {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip contentStyle={tooltipStyle} formatter={(v) => [Number(v).toLocaleString(), valueKey]} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
+    const first = data[0];
+    const keys = Object.keys(first);
 
-/* ── Scatter chart ─────────────────────────────────────────────────────────── */
-function ScatterChartView({ data, columnMap }) {
-  const xKey = columnMap.xAxis ?? Object.keys(data[0])[0];
-  const yKey = typeof columnMap.yAxis === 'string' ? columnMap.yAxis : (columnMap.yAxis?.[0] ?? Object.keys(data[0])[1]);
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <ScatterChart margin={{ top: 10, right: 16, left: 0, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#232A38" />
-        <XAxis dataKey={xKey} name={xKey} tick={axisStyle} />
-        <YAxis dataKey={yKey} name={yKey} tick={axisStyle} tickLine={false} axisLine={false} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: '3 3' }} />
-        <Scatter data={data} fill={AMBER} />
-      </ScatterChart>
-    </ResponsiveContainer>
-  );
-}
+    // Identify candidate keys
+    const x = columnMap.xAxis || keys.find(k => isNaN(Number(first[k]))) || keys[0];
+    const valKey = columnMap.value || keys.find(k => !isNaN(Number(first[k])) && k !== x) || keys[1] || keys[0];
+    const lblKey = columnMap.label || x;
 
-/* ── Data table ────────────────────────────────────────────────────────────── */
-function TableView({ data }) {
-  if (!data || data.length === 0) return null;
-  const cols = Object.keys(data[0]);
-  const tableStyle = {
-    width: '100%', borderCollapse: 'collapse',
-    fontFamily: "'Google Sans Mono', monospace", fontSize: '0.72rem',
-  };
-  const thStyle = {
-    textAlign: 'left', padding: '7px 10px',
-    color: '#5f6368', borderBottom: '1px solid #e0e0e0',
-    fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
-    fontSize: '0.62rem',
-  };
-  const tdStyle = {
-    padding: '6px 10px', color: '#202124',
-    borderBottom: '1px solid #f1f3f4',
-  };
-  return (
-    <div style={{ overflowX: 'auto', maxHeight: 260, overflowY: 'auto', marginTop: 4 }}>
-      <table style={tableStyle}>
-        <thead>
-          <tr>{cols.map(c => <th key={c} style={thStyle}>{c}</th>)}</tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-              {cols.map(c => <td key={c} style={tdStyle}>{row[c] ?? '—'}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+    const numKeys = keys.filter(k => {
+      if (k === x) return false;
+      return data.some(row => row[k] !== null && row[k] !== undefined && !isNaN(Number(row[k])));
+    });
 
-/* ── Main export ───────────────────────────────────────────────────────────── */
-export default function QueryChart({ chartType, data, columnMap }) {
-  if (!data || data.length === 0) {
+    const activeNumKeys = numKeys.length > 0 ? numKeys : [valKey];
+
+    const clean = data.map(row => {
+      const copy = { ...row };
+      keys.forEach(k => {
+        const val = row[k];
+        if (val !== null && val !== undefined && !isNaN(Number(val)) && typeof val !== 'boolean') {
+          copy[k] = Number(val);
+        }
+      });
+      return copy;
+    });
+
+    return {
+      sanitizedData: clean,
+      xKey: x,
+      numericKeys: activeNumKeys,
+      labelKey: lblKey,
+      valueKey: valKey,
+    };
+  }, [data, columnMap]);
+
+  if (!sanitizedData || sanitizedData.length === 0) {
     return (
-      <p style={{ color: '#9aa0a6', fontFamily: "'Google Sans Mono',monospace", fontSize: '0.78rem', padding: '1rem 0' }}>
-        No rows returned.
-      </p>
+      <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+        No chartable data returned.
+      </div>
     );
   }
 
-  switch (chartType) {
-    case 'bar':         return <BarChartView    data={data} columnMap={columnMap ?? {}} />;
-    case 'time_series': return <TimeSeriesView  data={data} columnMap={columnMap ?? {}} />;
-    case 'pie':         return <PieChartView    data={data} columnMap={columnMap ?? {}} />;
-    case 'scatter':     return <ScatterChartView data={data} columnMap={columnMap ?? {}} />;
-    default:            return <TableView       data={data} />;
-  }
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* ── View Switcher Tabs ─────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #f1f5f9',
+        paddingBottom: '0.5rem',
+      }}>
+        <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 3, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+          {[
+            { id: 'bar', label: 'Bar', icon: '📊' },
+            { id: 'area', label: 'Trend', icon: '📈' },
+            { id: 'pie', label: 'Donut', icon: '🍩' },
+            { id: 'table', label: 'Table', icon: '⊞' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                borderRadius: 6,
+                fontSize: '0.72rem',
+                fontWeight: activeTab === tab.id ? 600 : 500,
+                color: activeTab === tab.id ? '#0f172a' : '#64748b',
+                background: activeTab === tab.id ? '#ffffff' : 'transparent',
+                boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 150ms ease',
+                cursor: 'pointer',
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>
+          {sanitizedData.length} records
+        </span>
+      </div>
+
+      {/* ── Chart Rendering ────────────────────────────────────────────── */}
+      <div style={{ width: '100%', height: 280, position: 'relative', minWidth: 0 }}>
+        {/* BAR CHART */}
+        {activeTab === 'bar' && (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={sanitizedData} margin={{ top: 15, right: 12, left: 0, bottom: 35 }}>
+              <defs>
+                <linearGradient id="barGrad0" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                  <stop offset="100%" stopColor="#818cf8" stopOpacity={0.7} />
+                </linearGradient>
+                <linearGradient id="barGrad1" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.9} />
+                  <stop offset="100%" stopColor="#67e8f9" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis
+                dataKey={xKey}
+                tick={{ fill: '#64748b', fontSize: 11, fontFamily: "'Inter', sans-serif" }}
+                tickFormatter={v => truncate(v, 14)}
+                angle={-25}
+                textAnchor="end"
+                interval={0}
+                stroke="#cbd5e1"
+              />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 11, fontFamily: "'Inter', sans-serif" }}
+                tickFormatter={formatValue}
+                stroke="#cbd5e1"
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                contentStyle={customTooltipStyle}
+                formatter={(val, name) => [formatValue(val), name]}
+                cursor={{ fill: 'rgba(241, 245, 249, 0.8)' }}
+              />
+              {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />}
+              {numericKeys.map((key, idx) => (
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  fill={`url(#barGrad${idx % 2})`}
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={44}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+
+        {/* AREA / TREND CHART */}
+        {activeTab === 'area' && (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sanitizedData} margin={{ top: 15, right: 12, left: 0, bottom: 35 }}>
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.0} />
+                </linearGradient>
+                <linearGradient id="areaGrad2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey={xKey}
+                tick={{ fill: '#64748b', fontSize: 11 }}
+                tickFormatter={v => truncate(v, 14)}
+                angle={-25}
+                textAnchor="end"
+                stroke="#cbd5e1"
+              />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 11 }}
+                tickFormatter={formatValue}
+                stroke="#cbd5e1"
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                contentStyle={customTooltipStyle}
+                formatter={(val, name) => [formatValue(val), name]}
+              />
+              {numericKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />}
+              {numericKeys.map((key, idx) => (
+                <Area
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  stroke={PALETTE[idx % PALETTE.length]}
+                  strokeWidth={2.5}
+                  fill={idx === 0 ? 'url(#areaGrad)' : 'url(#areaGrad2)'}
+                  dot={{ r: 4, fill: PALETTE[idx % PALETTE.length], strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+
+        {/* DONUT / PIE CHART */}
+        {activeTab === 'pie' && (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={sanitizedData}
+                dataKey={valueKey}
+                nameKey={labelKey}
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={95}
+                paddingAngle={4}
+                label={({ name, percent }) => `${truncate(name, 12)} (${(percent * 100).toFixed(0)}%)`}
+                labelLine={false}
+              >
+                {sanitizedData.map((_, idx) => (
+                  <Cell
+                    key={`cell-${idx}`}
+                    fill={PALETTE[idx % PALETTE.length]}
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={customTooltipStyle}
+                formatter={(val, name) => [formatValue(val), name]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+
+        {/* DATA TABLE */}
+        {activeTab === 'table' && (
+          <div style={{ height: '100%', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10 }}>
+                <tr>
+                  {Object.keys(sanitizedData[0]).map(col => (
+                    <th key={col} style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sanitizedData.map((row, rIdx) => (
+                  <tr key={rIdx} style={{ background: rIdx % 2 === 0 ? '#fff' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
+                    {Object.keys(row).map(col => (
+                      <td key={col} style={{ padding: '8px 12px', color: '#1e293b' }}>
+                        {typeof row[col] === 'number' ? formatValue(row[col]) : String(row[col] ?? '—')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

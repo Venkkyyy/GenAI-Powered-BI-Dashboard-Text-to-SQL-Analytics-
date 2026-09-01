@@ -1,7 +1,9 @@
 /**
- * components/InputBar.jsx  v2 — Light theme
- * Bottom-docked Gemini-style input: white surface, blue focus ring,
- * suggestion chips, SQL typewriter, amber send button
+ * components/InputBar.jsx
+ *
+ * Antigravity Console Bar.
+ * Floating rounded card at the bottom of the screen with auto-grow textarea,
+ * quick-suggestion tags, and animated submit state.
  */
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -13,38 +15,16 @@ const SUGGESTIONS = [
   "Average order value",
 ];
 
-function useTypewriter(text) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!text) { setDisplayed(''); setDone(false); return; }
-    setDisplayed(''); setDone(false);
-    let i = 0;
-    const perChar = Math.min(18, Math.floor(450 / Math.max(text.length, 1)));
-    function tick() {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i < text.length) ref.current = setTimeout(tick, perChar);
-      else setDone(true);
-    }
-    ref.current = setTimeout(tick, perChar);
-    return () => clearTimeout(ref.current);
-  }, [text]);
-  return { displayed, done };
-}
-
 export default function InputBar({ onSubmit, loading, lastSQL, dataset }) {
-  const [value, setValue]   = useState('');
+  const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef(null);
-  const { displayed, done } = useTypewriter(lastSQL);
 
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [value]);
 
   function submit() {
@@ -55,134 +35,161 @@ export default function InputBar({ onSubmit, loading, lastSQL, dataset }) {
   }
 
   function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
   }
 
   const hasValue = value.trim().length > 0;
 
   return (
-    <div className="input-bar" style={{
-      position: 'fixed', bottom: 0, left: 280, right: 0,
-      zIndex: 100,
-      background: 'linear-gradient(to top, #ffffff 70%, rgba(255,255,255,0))',
-      padding: '1rem 2rem 1.25rem',
-    }}>
-      {/* SQL typewriter strip */}
-      {lastSQL && !loading && (
-        <div className="fade-in" style={{
-          maxWidth: 760, margin: '0 auto 0.6rem',
-          background: '#f1f3f4', borderRadius: 8,
-          padding: '0.4rem 0.85rem',
-          display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
-          border: '1px solid #e0e0e0',
-        }}>
-          <span style={{ color: 'var(--amber)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', marginTop: 1, flexShrink: 0 }}>›</span>
-          <pre style={{
-            fontFamily: 'var(--font-mono)', fontSize: '0.67rem', color: 'var(--text-2)',
-            whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.6, flex: 1,
-          }}>
-            {displayed}{!done && <span className="cursor-blink" />}
-          </pre>
-        </div>
-      )}
+    <div
+      className="input-bar"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 280,
+        right: 0,
+        zIndex: 100,
+        background: 'linear-gradient(to top, rgba(255,255,255,0.98) 75%, rgba(255,255,255,0))',
+        padding: '0.75rem 2rem 1.5rem',
+        backdropFilter: 'blur(10px)',
+      }}
+    >
+      <div style={{ maxWidth: 840, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {/* Dataset notification pill if active */}
+        {dataset && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.7rem',
+              fontFamily: 'var(--font-mono)',
+              background: '#eef2ff',
+              border: '1px solid #c7d2fe',
+              color: '#4338ca',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontWeight: 600,
+            }}>
+              📄 Active Dataset: {dataset.tableName} ({dataset.rowCount.toLocaleString()} rows)
+            </span>
+          </div>
+        )}
 
-      {/* Dataset badge */}
-      {dataset && (
-        <div style={{ maxWidth: 760, margin: '0 auto 0.4rem', display: 'flex' }}>
-          <span style={{
-            fontSize: '0.68rem', fontFamily: 'var(--font-mono)',
-            background: '#fff8e7', border: '1px solid #f9ab00',
-            borderRadius: 4, padding: '1px 8px', color: '#b06000',
-          }}>
-            📄 Querying: {dataset.tableName} ({dataset.rowCount.toLocaleString()} rows)
-          </span>
-        </div>
-      )}
-
-      {/* Main input */}
-      <div style={{
-        maxWidth: 760, margin: '0 auto',
-        background: '#fff',
-        border: `1.5px solid ${focused ? 'var(--blue)' : 'var(--border)'}`,
-        borderRadius: 24,
-        boxShadow: focused ? '0 0 0 3px rgba(26,115,232,0.12)' : 'var(--shadow-sm)',
-        transition: 'all var(--t-mid)',
-        overflow: 'hidden',
-      }}>
-        <div style={{ padding: '0.85rem 1.25rem 0.25rem' }}>
-          <textarea
-            ref={textareaRef}
-            id="console-input"
-            rows={1}
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={handleKey}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            disabled={loading}
-            placeholder={dataset ? `Ask anything about ${dataset.tableName}…` : 'Ask anything about your data…'}
-            style={{
-              width: '100%', background: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--text-1)', fontFamily: 'var(--font-ui)', fontSize: '0.95rem',
-              lineHeight: 1.6, resize: 'none', minHeight: 28,
-              caretColor: 'var(--blue)',
-            }}
-            aria-label="Ask a question about your data"
-          />
-        </div>
-
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0.2rem 0.75rem 0.65rem', gap: '0.5rem',
-        }}>
-          {/* Suggestion chips */}
-          <div style={{ display: 'flex', gap: '0.35rem', overflow: 'hidden', flex: 1, flexWrap: 'nowrap' }}>
-            {!hasValue && !loading && SUGGESTIONS.slice(0, 3).map(s => (
-              <button key={s} onClick={() => onSubmit(s)}
-                style={{
-                  fontFamily: 'var(--font-ui)', fontSize: '0.7rem', fontWeight: 500,
-                  color: 'var(--text-2)', background: 'var(--bg-2)',
-                  border: '1px solid var(--border)', borderRadius: 20,
-                  padding: '0.2rem 0.7rem', whiteSpace: 'nowrap',
-                  cursor: 'pointer', transition: 'all var(--t-fast)', flexShrink: 0,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--amber)'; e.currentTarget.style.color = 'var(--amber)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-2)'; }}
-              >{s}</button>
-            ))}
+        {/* Floating Input Card */}
+        <div
+          style={{
+            background: '#ffffff',
+            border: `1.5px solid ${focused ? '#4f46e5' : '#cbd5e1'}`,
+            borderRadius: 20,
+            boxShadow: focused
+              ? '0 10px 30px -5px rgba(79, 70, 229, 0.15), 0 0 0 3px rgba(79, 70, 229, 0.1)'
+              : '0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.02)',
+            transition: 'all 180ms ease',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Textarea Field */}
+          <div style={{ padding: '0.85rem 1.25rem 0.25rem' }}>
+            <textarea
+              ref={textareaRef}
+              id="console-input"
+              rows={1}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={handleKey}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              disabled={loading}
+              placeholder={
+                dataset
+                  ? `Ask a question about ${dataset.tableName}... (e.g. "top records by ${dataset.columns[0]?.name || 'value'}")`
+                  : 'Ask any question about your data in plain English…'
+              }
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: '#0f172a',
+                fontFamily: 'var(--font-body)',
+                fontSize: '0.95rem',
+                lineHeight: 1.5,
+                resize: 'none',
+                minHeight: 26,
+              }}
+              aria-label="Ask a question about your data"
+            />
           </div>
 
-          {/* Send button */}
-          <button
-            id="console-submit"
-            onClick={submit}
-            disabled={loading || !hasValue}
-            aria-label={loading ? 'Running…' : 'Send'}
-            style={{
-              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-              background: (loading || !hasValue) ? '#f1f3f4' : '#202124',
-              border: 'none', cursor: (loading || !hasValue) ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all var(--t-fast)',
-            }}
-          >
-            {loading ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" style={{ animation: 'spin 0.9s linear infinite' }}>
-                <circle cx="12" cy="12" r="9" stroke="#f29900" strokeWidth="2.5" fill="none" strokeDasharray="30" strokeDashoffset="15"/>
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M7 11L12 6L17 11M12 6V18" stroke={hasValue ? '#ffffff' : '#9aa0a6'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
+          {/* Bottom Bar inside input */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.2rem 0.75rem 0.65rem',
+            gap: '0.5rem',
+          }}>
+            {/* Suggestion Pills */}
+            <div style={{ display: 'flex', gap: '0.35rem', overflow: 'hidden', flex: 1 }}>
+              {!hasValue && !loading && SUGGESTIONS.slice(0, 3).map(s => (
+                <button
+                  key={s}
+                  onClick={() => onSubmit(s)}
+                  className="btn-ghost-pill"
+                  style={{ fontSize: '0.72rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
 
-      <p style={{ textAlign: 'center', fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.4rem', fontFamily: 'var(--font-mono)' }}>
-        Enter ↵ to run · Shift+Enter for newline
-      </p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            {/* Submit Arrow Button */}
+            <button
+              id="console-submit"
+              onClick={submit}
+              disabled={loading || !hasValue}
+              aria-label={loading ? 'Processing…' : 'Run Query'}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: (loading || !hasValue) ? '#f1f5f9' : '#09090b',
+                color: (loading || !hasValue) ? '#94a3b8' : '#ffffff',
+                border: 'none',
+                cursor: (loading || !hasValue) ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 150ms ease',
+                boxShadow: (!loading && hasValue) ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+              }}
+            >
+              {loading ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" className="spin">
+                  <circle cx="12" cy="12" r="9" stroke="#4f46e5" strokeWidth="2.5" fill="none" strokeDasharray="30" strokeDashoffset="15" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 11L12 6L17 11M12 6V18" stroke={hasValue ? '#ffffff' : '#94a3b8'} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Helper footnote */}
+        <p style={{
+          textAlign: 'center',
+          fontSize: '0.65rem',
+          color: '#94a3b8',
+          fontFamily: 'var(--font-heading)',
+          fontWeight: 500,
+        }}>
+          Press <kbd style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4, border: '1px solid #e2e8f0', color: '#475569' }}>Enter ↵</kbd> to analyze · Powered by Antigravity GenAI Text-to-SQL
+        </p>
+      </div>
     </div>
   );
 }
