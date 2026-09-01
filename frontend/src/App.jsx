@@ -26,7 +26,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [counter, setCounter] = useState(0);
   const [dataset, setDataset] = useState(null);
-  const gridRef = useRef(null);
+  const bottomRef = useRef(null);
 
   /* ── Submit question ────────────────────────────────────────────────────── */
   const submitQuestion = useCallback(async (question) => {
@@ -58,9 +58,9 @@ export default function App() {
         askedAt: json.askedAt ?? new Date().toISOString(),
         dataSource: dataset ? 'dataset' : 'database',
       };
-      setResults(prev => [entry, ...prev]);
+      setResults(prev => [...prev, entry]);
 
-      setTimeout(() => gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 120);
     } catch {
       setError('Connection error — is the backend server running on port 3001?');
     } finally {
@@ -346,45 +346,51 @@ export default function App() {
             </div>
           )}
 
-          {/* ── Loading Skeleton ─────────────────────────────────────────── */}
+          {/* ── Result Cards Feed (Chronological: Older on top, Newer below) ── */}
+          {results.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5rem',
+                maxWidth: 960,
+                margin: '0 auto',
+                width: '100%',
+              }}
+            >
+              {results.map((r, i) => (
+                <ResultCard key={r.id ?? i} result={r} index={i + 1} />
+              ))}
+            </div>
+          )}
+
+          {/* ── Loading Skeleton (Appears at the bottom under previous tasks) ── */}
           {loading && (
             <div
-              ref={gridRef}
+              className="card-enter"
               style={{
-                maxWidth: 840,
-                margin: '0 auto 1.5rem',
+                maxWidth: 960,
+                margin: '1.5rem auto 0',
+                width: '100%',
                 background: '#ffffff',
                 border: '1px solid #e2e8f0',
-                borderRadius: 20,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+                borderRadius: 18,
+                boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.05)',
                 padding: '1.5rem',
               }}
             >
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 <div style={{ width: 32, height: 16, background: '#f1f5f9', borderRadius: 4 }} />
-                <div style={{ width: 80, height: 16, background: '#f1f5f9', borderRadius: 4 }} />
+                <div style={{ width: 120, height: 16, background: '#f1f5f9', borderRadius: 4 }} />
               </div>
-              <div style={{ width: '60%', height: 22, background: '#f1f5f9', borderRadius: 6, marginBottom: 20 }} />
-              <div style={{ width: '100%', height: 220, background: '#f8fafc', borderRadius: 12, marginBottom: 16 }} />
+              <div style={{ width: '70%', height: 24, background: '#f1f5f9', borderRadius: 6, marginBottom: 20 }} />
+              <div style={{ width: '100%', height: 140, background: '#09090b', borderRadius: 12, marginBottom: 16 }} />
+              <div style={{ width: '100%', height: 220, background: '#f8fafc', borderRadius: 12 }} />
             </div>
           )}
 
-          {/* ── Result Cards Grid ────────────────────────────────────────── */}
-          {results.length > 0 && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 540px), 1fr))',
-                gap: '1.25rem',
-                maxWidth: 1140,
-                margin: '0 auto',
-              }}
-            >
-              {results.map((r, i) => (
-                <ResultCard key={r.id ?? i} result={r} index={r.id ?? (results.length - i)} />
-              ))}
-            </div>
-          )}
+          {/* Bottom scroll target anchor */}
+          <div ref={bottomRef} style={{ height: 1 }} />
         </main>
 
         {/* ── Floating Console Bar ──────────────────────────────────────── */}

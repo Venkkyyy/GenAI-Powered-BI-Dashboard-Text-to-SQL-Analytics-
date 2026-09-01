@@ -1,18 +1,19 @@
 /**
  * components/ResultCard.jsx
  *
- * Antigravity-style BI Readout Card.
- * Clean white surface, gradient border highlight, KPI metrics row,
- * interactive chart engine, formatted SQL inspector, and feedback.
+ * Core BI Solution Card:
+ * 1. User Natural Language Question
+ * 2. MAIN TARGET: AI Generated SQL (Line-by-Line Formatted with Line Numbers & IDE theme)
+ * 3. Live Interactive Recharts Visualization (Bar / Trend / Donut / Table)
+ * 4. Summary Metrics, AI Explanation & Feedback
  */
 import React, { useMemo, useState } from 'react';
 import QueryChart from './QueryChart';
-import { highlightSQL } from '../utils/sqlHighlight';
+import { FormattedSQLViewer } from '../utils/sqlHighlight';
 
 export default function ResultCard({ result, index }) {
-  const [sqlOpen, setSqlOpen] = useState(false);
-  const [vote, setVote]       = useState(null);
-  const [copied, setCopied]   = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [vote, setVote]     = useState(null);
 
   const ts = new Date(result.askedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -36,7 +37,7 @@ export default function ResultCard({ result, index }) {
     } catch {}
   }
 
-  // Quick KPI calculation
+  // Calculate Quick Metric Summary
   const summaryKpi = useMemo(() => {
     if (!result.data || result.data.length === 0) return null;
     const firstRow = result.data[0];
@@ -48,7 +49,7 @@ export default function ResultCard({ result, index }) {
     return {
       label: numKey.replace(/_/g, ' ').toUpperCase(),
       total: sum >= 1000 ? `$${sum.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : sum.toLocaleString(),
-      topItem: firstRow[keys[0]],
+      count: result.data.length,
     };
   }, [result.data]);
 
@@ -60,108 +61,157 @@ export default function ResultCard({ result, index }) {
       style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',
-        borderRadius: 20,
-        boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+        borderRadius: 18,
+        boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'all 200ms ease',
+        marginBottom: '1.5rem',
       }}
     >
-      {/* Sleek Gradient Accent Line */}
+      {/* ── Top Color Accent Strip ─────────────────────────────────────── */}
       <div style={{
         height: 4,
-        background: 'linear-gradient(90deg, #4f46e5 0%, #06b6d4 50%, #8b5cf6 100%)',
+        background: 'linear-gradient(90deg, #4f46e5 0%, #06b6d4 50%, #10b981 100%)',
       }} />
 
-      <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
+      <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+        {/* ── 1. USER QUESTION HEADER ──────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 6 }}>
               <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.65rem',
                 fontWeight: 700,
                 color: '#4f46e5',
                 background: '#eef2ff',
-                padding: '1px 6px',
-                borderRadius: 4,
+                padding: '2px 8px',
+                borderRadius: 999,
               }}>
-                #{String(index).padStart(2, '0')}
+                Query #{String(index).padStart(2, '0')}
               </span>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{ts}</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{ts}</span>
               {result.executionMs != null && (
-                <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>· {result.executionMs}ms</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>· {result.executionMs}ms execution</span>
               )}
               {result.provider && (
                 <span style={{
                   fontSize: '0.65rem',
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
-                  color: '#64748b',
+                  color: '#475569',
                   borderRadius: 4,
                   padding: '1px 6px',
+                  fontWeight: 500,
                 }}>
                   {result.provider}
                 </span>
               )}
             </div>
 
-            <h3 style={{
+            <h2 style={{
               fontFamily: 'var(--font-heading)',
-              fontSize: '1.05rem',
-              fontWeight: 700,
+              fontSize: '1.2rem',
+              fontWeight: 800,
               color: '#0f172a',
               lineHeight: 1.35,
-              marginTop: 2,
             }}>
               {result.question}
-            </h3>
+            </h2>
           </div>
         </div>
 
-        {/* ── KPI Summary Strip (if numeric data present) ─────────────── */}
-        {summaryKpi && hasData && (
+        {/* ── 2. PRIMARY TARGET: AI GENERATED SQL TERMINAL ─────────────── */}
+        <div style={{
+          background: '#09090b',
+          borderRadius: 14,
+          border: '1px solid #1e293b',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+          overflow: 'hidden',
+        }}>
+          {/* Terminal Header Bar */}
           <div style={{
+            background: '#18181b',
+            padding: '8px 14px',
             display: 'flex',
             alignItems: 'center',
-            gap: '1.25rem',
-            background: '#f8fafc',
-            border: '1px solid #f1f5f9',
-            borderRadius: 12,
-            padding: '0.65rem 1rem',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid #27272a',
           }}>
-            <div>
-              <p style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600, letterSpacing: '0.05em' }}>
-                TOTAL {summaryKpi.label}
-              </p>
-              <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-heading)' }}>
-                {summaryKpi.total}
-              </p>
-            </div>
-            {summaryKpi.topItem && (
-              <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '1.25rem' }}>
-                <p style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600, letterSpacing: '0.05em' }}>
-                  TOP CONTRIBUTOR
-                </p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4f46e5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
-                  {summaryKpi.topItem}
-                </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
               </div>
-            )}
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                color: '#e2e8f0',
+                letterSpacing: '0.02em',
+              }}>
+                Generated SQL (AST Validated)
+              </span>
+            </div>
+
+            <button
+              onClick={copySQL}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: copied ? '#10b981' : '#27272a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '4px 10px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
+            >
+              <span>{copied ? '✓' : '📋'}</span>
+              <span>{copied ? 'Copied' : 'Copy SQL'}</span>
+            </button>
+          </div>
+
+          {/* Formatted Line-by-Line Code Area */}
+          <div style={{ padding: '1rem 1.25rem' }}>
+            <FormattedSQLViewer sql={result.sql} />
+          </div>
+        </div>
+
+        {/* ── 3. AI EXPLANATION & KEY FINDINGS ─────────────────────────── */}
+        {result.explanation && (
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderLeft: '3px solid #4f46e5',
+            borderRadius: 8,
+            padding: '0.75rem 1rem',
+            fontSize: '0.82rem',
+            color: '#334155',
+            lineHeight: 1.5,
+          }}>
+            <strong style={{ color: '#0f172a' }}>AI Insight: </strong>
+            {result.explanation}
           </div>
         )}
 
-        {/* ── Chart / Data View ───────────────────────────────────────── */}
+        {/* ── 4. LIVE INTERACTIVE CHART & DATA VISUALIZATION ───────────── */}
         {result.error ? (
           <div style={{
             background: '#fff1f2',
             border: '1px solid #ffe4e6',
             borderRadius: 12,
-            padding: '0.85rem 1rem',
-            fontSize: '0.82rem',
+            padding: '1rem',
+            fontSize: '0.85rem',
             color: '#e11d48',
+            fontWeight: 500,
           }}>
             ⚠ {result.error}
           </div>
@@ -170,8 +220,22 @@ export default function ResultCard({ result, index }) {
             background: '#ffffff',
             border: '1px solid #f1f5f9',
             borderRadius: 14,
-            padding: '0.75rem',
+            padding: '1rem',
           }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.85rem' }}>📊</span>
+                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                  Visual Analytics
+                </span>
+              </div>
+              {summaryKpi && (
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                  Total {summaryKpi.label}: <strong style={{ color: '#0f172a' }}>{summaryKpi.total}</strong>
+                </span>
+              )}
+            </div>
+
             <QueryChart
               chartType={result.chartType}
               data={result.data}
@@ -179,121 +243,58 @@ export default function ResultCard({ result, index }) {
             />
           </div>
         ) : (
-          <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-            No rows returned.
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+            Query executed successfully. 0 rows matched your criteria.
           </div>
         )}
 
-        {/* ── SQL Inspector (Collapsible) ─────────────────────────────── */}
-        <div style={{
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: 10,
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '6px 12px',
-          }}>
-            <button
-              onClick={() => setSqlOpen(o => !o)}
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                color: '#475569',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                cursor: 'pointer',
-              }}
-            >
-              <span>{sqlOpen ? '▾' : '▸'}</span>
-              <span>SQL Query</span>
-            </button>
-            {sqlOpen && (
-              <button
-                onClick={copySQL}
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  color: copied ? '#10b981' : '#6366f1',
-                  cursor: 'pointer',
-                  padding: '2px 6px',
-                }}
-              >
-                {copied ? '✓ Copied' : 'Copy'}
-              </button>
-            )}
-          </div>
-
-          {sqlOpen && (
-            <pre style={{
-              padding: '0.75rem 1rem',
-              margin: 0,
-              background: '#09090b',
-              color: '#f8fafc',
-              fontSize: '0.75rem',
-              fontFamily: 'var(--font-mono)',
-              lineHeight: 1.6,
-              overflowX: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              borderTop: '1px solid #1e293b',
-            }}>
-              {highlightSQL(result.sql ?? '')}
-            </pre>
-          )}
-        </div>
-
-        {/* ── AI Explanation & Feedback ──────────────────────────────── */}
+        {/* ── 5. FOOTER: FEEDBACK & DETAILS ────────────────────────────── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.75rem',
-          paddingTop: '0.25rem',
+          borderTop: '1px solid #f1f5f9',
+          paddingTop: '0.75rem',
         }}>
-          {result.explanation ? (
-            <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, flex: 1 }}>
-              {result.explanation}
-            </p>
-          ) : <div />}
+          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+            {result.rowCount ?? (result.data?.length || 0)} records returned
+          </span>
 
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Was this SQL accurate?</span>
             <button
               onClick={() => submitFeedback('up')}
-              title="Helpful"
+              title="Yes, accurate SQL"
               style={{
-                width: 28, height: 28, borderRadius: 6,
+                padding: '3px 8px',
+                borderRadius: 6,
                 border: '1px solid #e2e8f0',
                 background: vote === 'up' ? '#eef2ff' : '#ffffff',
                 color: vote === 'up' ? '#4f46e5' : '#64748b',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.75rem',
                 cursor: 'pointer',
-                fontSize: '0.8rem',
               }}
             >
-              👍
+              👍 Yes
             </button>
             <button
               onClick={() => submitFeedback('down')}
-              title="Not helpful"
+              title="No, incorrect"
               style={{
-                width: 28, height: 28, borderRadius: 6,
+                padding: '3px 8px',
+                borderRadius: 6,
                 border: '1px solid #e2e8f0',
                 background: vote === 'down' ? '#fff1f2' : '#ffffff',
                 color: vote === 'down' ? '#e11d48' : '#64748b',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.75rem',
                 cursor: 'pointer',
-                fontSize: '0.8rem',
               }}
             >
-              👎
+              👎 No
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
