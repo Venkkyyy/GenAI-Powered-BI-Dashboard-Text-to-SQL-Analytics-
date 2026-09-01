@@ -1,7 +1,10 @@
 /**
  * components/UploadPanel.jsx
- * Drag-and-drop CSV/TSV upload panel shown in the sidebar.
- * Displays dataset schema preview + clear button when loaded.
+ *
+ * Drag-and-drop CSV uploader with:
+ * - 1-click Sample Dataset loader
+ * - Direct download of sample CSV
+ * - Active dataset column schema preview
  */
 import React, { useCallback, useRef, useState } from 'react';
 
@@ -18,13 +21,28 @@ export default function UploadPanel({ dataset, onUpload, onClear }) {
     const form = new FormData();
     form.append('file', file);
     try {
-      const res  = await fetch('/api/upload', { method: 'POST', body: form });
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? 'Upload failed'); return; }
       onUpload(json);
     } catch {
       setError('Network error — is the backend running?');
     } finally {
+      setUploading(false);
+    }
+  }
+
+  // 1-Click Load Sample Dataset directly from frontend
+  async function loadSampleDataset() {
+    setUploading(true);
+    setError(null);
+    try {
+      const response = await fetch('/sample_sales_data.csv');
+      const blob = await response.blob();
+      const file = new File([blob], 'sample_sales_data.csv', { type: 'text/csv' });
+      await handleFile(file);
+    } catch {
+      setError('Could not load sample dataset.');
       setUploading(false);
     }
   }
@@ -40,53 +58,67 @@ export default function UploadPanel({ dataset, onUpload, onClear }) {
 
   if (dataset) {
     return (
-      <div style={{ padding: '0 0.75rem 0.75rem' }}>
+      <div style={{ padding: '0 0.85rem 0.85rem' }}>
         {/* Active dataset card */}
         <div style={{
-          background: '#fff8e7',
-          border: '1px solid #f9ab00',
-          borderRadius: 10,
-          padding: '0.75rem',
+          background: '#f8fafc',
+          border: '1px solid #cbd5e1',
+          borderRadius: 12,
+          padding: '0.85rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
             <div>
-              <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#202124' }}>📄 {dataset.originalFilename}</p>
-              <p style={{ fontSize: '0.68rem', color: '#5f6368', marginTop: 2 }}>
+              <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>📄 {dataset.originalFilename}</p>
+              <p style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 2 }}>
                 {dataset.rowCount.toLocaleString()} rows · {dataset.columns.length} columns
               </p>
             </div>
             <button
               onClick={onClear}
-              title="Remove dataset"
+              title="Switch back to Live PostgreSQL"
               style={{
-                fontSize: '0.7rem', color: '#d93025', background: 'none', border: 'none',
-                cursor: 'pointer', padding: '2px 6px', borderRadius: 4,
-                transition: 'background 120ms',
+                fontSize: '0.7rem',
+                color: '#e11d48',
+                background: '#fff1f2',
+                border: '1px solid #ffe4e6',
+                cursor: 'pointer',
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontWeight: 600,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#fce8e6'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >✕</button>
+            >
+              Clear ✕
+            </button>
           </div>
 
           {/* Column list */}
           <div style={{
-            maxHeight: 120, overflowY: 'auto',
-            display: 'flex', flexWrap: 'wrap', gap: 3,
+            maxHeight: 120,
+            overflowY: 'auto',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 4,
+            marginTop: 8,
           }}>
             {dataset.columns.map(col => (
               <span key={col.name} style={{
-                fontFamily: 'var(--font-mono)', fontSize: '0.6rem',
-                background: col.type === 'NUMBER' ? '#e8f0fe' : col.type === 'DATE' ? '#e6f4ea' : '#f1f3f4',
-                color: col.type === 'NUMBER' ? '#1a73e8' : col.type === 'DATE' ? '#1e8e3e' : '#5f6368',
-                borderRadius: 4, padding: '1px 5px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.62rem',
+                fontWeight: 600,
+                background: col.type === 'NUMBER' ? '#eef2ff' : col.type === 'DATE' ? '#ecfdf5' : '#f1f5f9',
+                color: col.type === 'NUMBER' ? '#4f46e5' : col.type === 'DATE' ? '#059669' : '#475569',
+                border: `1px solid ${col.type === 'NUMBER' ? '#c7d2fe' : col.type === 'DATE' ? '#a7f3d0' : '#e2e8f0'}`,
+                borderRadius: 4,
+                padding: '1px 5px',
               }}>
                 {col.name}
               </span>
             ))}
           </div>
 
-          <p style={{ fontSize: '0.65rem', color: '#f29900', marginTop: 6, fontWeight: 500 }}>
-            ✓ Queries run on this file
+          <p style={{ fontSize: '0.65rem', color: '#16a34a', marginTop: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>●</span> Queries execute on this file (in-memory)
           </p>
         </div>
       </div>
@@ -94,7 +126,7 @@ export default function UploadPanel({ dataset, onUpload, onClear }) {
   }
 
   return (
-    <div style={{ padding: '0 0.75rem 0.75rem' }}>
+    <div style={{ padding: '0 0.85rem 0.85rem' }}>
       {/* Drop zone */}
       <div
         onDrop={onDrop}
@@ -102,23 +134,23 @@ export default function UploadPanel({ dataset, onUpload, onClear }) {
         onDragLeave={onDragLeave}
         onClick={() => inputRef.current?.click()}
         style={{
-          border: `2px dashed ${dragging ? '#1a73e8' : '#dadce0'}`,
-          borderRadius: 10,
-          padding: '1.25rem 0.75rem',
+          border: `2px dashed ${dragging ? '#4f46e5' : '#cbd5e1'}`,
+          borderRadius: 12,
+          padding: '1.1rem 0.75rem',
           textAlign: 'center',
           cursor: 'pointer',
-          background: dragging ? '#e8f0fe' : '#fafafa',
-          transition: 'all 150ms',
+          background: dragging ? '#eef2ff' : '#f8fafc',
+          transition: 'all 150ms ease',
         }}
       >
-        <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>
-          {uploading ? '⏳' : '📂'}
+        <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>
+          {uploading ? '⏳' : '📁'}
         </div>
-        <p style={{ fontSize: '0.78rem', fontWeight: 500, color: '#202124', marginBottom: 4 }}>
-          {uploading ? 'Uploading…' : 'Upload your data'}
+        <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0f172a', marginBottom: 2 }}>
+          {uploading ? 'Parsing dataset…' : 'Upload CSV / TSV'}
         </p>
-        <p style={{ fontSize: '0.68rem', color: '#5f6368' }}>
-          CSV or TSV · up to 5MB
+        <p style={{ fontSize: '0.65rem', color: '#64748b' }}>
+          Drag & drop or click to browse
         </p>
         <input
           ref={inputRef}
@@ -130,14 +162,49 @@ export default function UploadPanel({ dataset, onUpload, onClear }) {
       </div>
 
       {error && (
-        <p style={{ fontSize: '0.68rem', color: '#d93025', marginTop: 6, padding: '4px 0' }}>
+        <p style={{ fontSize: '0.68rem', color: '#e11d48', marginTop: 6, padding: '4px 0' }}>
           ⚠ {error}
         </p>
       )}
 
-      <p style={{ fontSize: '0.65rem', color: '#9aa0a6', marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>
-        Or query the built-in e-commerce demo data below
-      </p>
+      {/* 1-Click Load Sample Button */}
+      <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <button
+          onClick={loadSampleDataset}
+          disabled={uploading}
+          style={{
+            width: '100%',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 6,
+            padding: '5px 8px',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            color: '#4f46e5',
+            cursor: 'pointer',
+            textAlign: 'center',
+            transition: 'all 120ms ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#eef2ff'}
+          onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+        >
+          ✨ 1-Click: Load Sample Sales CSV
+        </button>
+
+        <a
+          href="/sample_sales_data.csv"
+          download="sample_sales_data.csv"
+          style={{
+            fontSize: '0.65rem',
+            color: '#64748b',
+            textAlign: 'center',
+            textDecoration: 'none',
+            padding: '2px',
+          }}
+        >
+          📥 Download sample_sales_data.csv
+        </a>
+      </div>
     </div>
   );
 }
