@@ -54,7 +54,7 @@ export default function Sidebar({ history, dataset, onNew, onSelect, onUpload, o
             color: '#64748b',
             fontWeight: 500,
           }}>
-            Antigravity BI Platform
+            GenAI BI Platform
           </span>
         </div>
       </div>

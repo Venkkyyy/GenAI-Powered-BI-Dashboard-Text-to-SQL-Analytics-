@@ -118,12 +118,12 @@ export default function App() {
           zIndex: 1,
         }}
       >
-        {/* ── Antigravity Top Nav Bar ──────────────────────────────────────── */}
+        {/* ── Queryline Top Bar ────────────────────────────────────────────── */}
         <header
           style={{
             height: 60,
             borderBottom: '1px solid #f1f5f9',
-            background: 'rgba(255, 255, 255, 0.85)',
+            background: 'rgba(255, 255, 255, 0.92)',
             backdropFilter: 'blur(12px)',
             display: 'flex',
             alignItems: 'center',
@@ -134,38 +134,39 @@ export default function App() {
             zIndex: 40,
           }}
         >
-          {/* Nav Links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <path d="M16 4L4 26H28L16 4Z" fill="#4f46e5" />
-                <path d="M16 12L9 25H23L16 12Z" fill="#06b6d4" />
-              </svg>
-              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '0.9rem', color: '#09090b' }}>
-                Google Antigravity
+          {/* Active Data Source Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: dataset ? '#eff6ff' : '#f0fdf4',
+                border: `1px solid ${dataset ? '#bfdbfe' : '#bbf7d0'}`,
+                color: dataset ? '#1d4ed8' : '#15803d',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '3px 10px',
+                borderRadius: 999,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dataset ? '#2563eb' : '#16a34a', display: 'inline-block' }} />
+                {dataset ? `Custom File: ${dataset.tableName}` : 'Supabase PostgreSQL (Live)'}
               </span>
             </div>
 
-            <nav style={{ display: 'flex', gap: '1.25rem', fontSize: '0.82rem', fontWeight: 500, color: '#475569' }}>
-              <span style={{ cursor: 'pointer' }}>Products ▾</span>
-              <span style={{ cursor: 'pointer' }}>Use Cases ▾</span>
-              <span style={{ cursor: 'pointer' }}>Pricing</span>
-              <span style={{ cursor: 'pointer' }}>Enterprise</span>
-            </nav>
+            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+              {dataset ? `${dataset.rowCount.toLocaleString()} rows · ${dataset.columns.length} columns` : '4 tables introspected · AST Guard active'}
+            </span>
           </div>
 
           {/* Right Action */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-              Live DB Connected
-            </span>
             <button
               className="btn-antigravity"
               style={{ padding: '0.45rem 1.1rem', fontSize: '0.78rem' }}
               onClick={() => submitQuestion('top 5 products by revenue')}
             >
-              <span>🚀 Quick Demo</span>
+              <span>⚡ Run Sample Query</span>
             </button>
           </div>
         </header>
@@ -189,10 +190,10 @@ export default function App() {
                 alignItems: 'center',
                 textAlign: 'center',
                 padding: '3rem 1rem 1rem',
-                gap: '2.25rem',
+                gap: '2rem',
               }}
             >
-              {/* Central Antigravity Badge */}
+              {/* Product Feature Badge */}
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -206,45 +207,42 @@ export default function App() {
                 color: '#475569',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
               }}>
-                <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-                  <path d="M16 4L4 26H28L16 4Z" fill="#4f46e5" />
-                  <path d="M16 12L9 25H23L16 12Z" fill="#06b6d4" />
-                </svg>
-                <span>Google Antigravity · Next-Gen Agentic BI Platform</span>
+                <span style={{ color: '#4f46e5' }}>✦</span>
+                <span>GenAI-Powered Text-to-SQL Business Intelligence</span>
               </div>
 
-              {/* Massive Hero Heading */}
+              {/* Hero Heading */}
               <div style={{ maxWidth: 780 }}>
                 <h1
                   style={{
                     fontFamily: 'var(--font-heading)',
-                    fontSize: '3.25rem',
+                    fontSize: '3rem',
                     fontWeight: 800,
                     letterSpacing: '-0.03em',
-                    lineHeight: 1.1,
+                    lineHeight: 1.15,
                     color: '#09090b',
                     marginBottom: '1rem',
                   }}
                 >
-                  Experience liftoff with your business data
+                  Turn plain questions into live analytics
                 </h1>
                 <p
                   style={{
-                    fontSize: '1.1rem',
+                    fontSize: '1.08rem',
                     color: '#475569',
                     lineHeight: 1.6,
-                    maxWidth: 640,
+                    maxWidth: 620,
                     margin: '0 auto',
                   }}
                 >
                   {dataset
-                    ? `Ready to explore ${dataset.tableName}. Ask any business question to generate SQL and visual readouts instantly.`
-                    : 'Turn natural-language questions into live charts. Grounded by database schema introspection and guarded by AST validation.'
+                    ? `Dataset "${dataset.tableName}" is loaded and ready. Ask any business question to generate SQL and visual readouts instantly.`
+                    : 'Ask plain-English business questions. Queryline generates AST-validated SQL against your live database schema and charts the answers instantly.'
                   }
                 </p>
               </div>
 
-              {/* Hero Call to Action Buttons */}
+              {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button
                   className="btn-antigravity"
