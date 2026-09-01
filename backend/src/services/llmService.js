@@ -117,26 +117,39 @@ async function callGroq(systemPrompt, userMessage) {
  */
 async function callGemini(systemPrompt, userMessage) {
   const genAI = getGeminiClient();
-  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const primaryModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const candidateModels = [primaryModel, "gemini-3.6-flash", "gemini-3.7-flash"];
+  // Deduplicate candidate models
+  const modelsToTry = [...new Set(candidateModels)];
 
-  console.log(`[llm] Calling Gemini (${modelName})...`);
+  let lastErr = null;
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`[llm] Calling Gemini (${modelName})...`);
 
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    systemInstruction: systemPrompt,
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 1024,
-      responseMimeType: "application/json", // Gemini JSON mode
-    },
-  });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json",
+        },
+      });
 
-  const result = await model.generateContent(userMessage);
-  const text = result.response.text();
-  console.log(`[llm] Gemini raw response: ${text.slice(0, 300)}`);
+      const result = await model.generateContent(userMessage);
+      const text = result.response.text();
+      console.log(`[llm] Gemini raw response: ${text.slice(0, 300)}`);
 
-  const parsed = parseResponse(text);
-  return { ...parsed, provider: "gemini" };
+      const parsed = parseResponse(text);
+      return { ...parsed, provider: `gemini (${modelName})` };
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[llm] Gemini (${modelName}) error: ${err.message}. Trying next candidate if available.`);
+    }
+  }
+
+  throw lastErr;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

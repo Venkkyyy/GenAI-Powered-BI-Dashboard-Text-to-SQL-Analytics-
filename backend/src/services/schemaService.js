@@ -112,14 +112,26 @@ async function refreshSchema() {
     allowedColumns[table] = new Set(columns.map((c) => c.name));
   }
 
+  // Default fallback schema if tables haven't been created in Supabase yet
+  const fallbackFormatted = `
+customers(customer_id INT PK, name TEXT, email TEXT, region TEXT, signup_date DATE)
+products(product_id INT PK, name TEXT, category TEXT, price NUMERIC)
+orders(order_id INT PK, customer_id INT, order_date DATE, status TEXT)
+order_items(order_item_id INT PK, order_id INT, product_id INT, quantity INT, unit_price NUMERIC)
+`.trim();
+
+  const tables = Object.keys(raw).length > 0 ? Object.keys(raw) : ALLOWED_TABLES;
+
   _cache = {
     raw,
-    formatted,
-    allowedTables: Object.keys(raw),
+    formatted: formatted || fallbackFormatted,
+    tables,
+    columns: new Map(Object.entries(allowedColumns)),
+    allowedTables: tables,
     allowedColumns,
   };
   _cacheTimestamp = Date.now();
-  console.log(`[schema] Cached ${_cache.allowedTables.length} tables.`);
+  console.log(`[schema] Cached ${_cache.tables.length} tables.`);
   return _cache;
 }
 
