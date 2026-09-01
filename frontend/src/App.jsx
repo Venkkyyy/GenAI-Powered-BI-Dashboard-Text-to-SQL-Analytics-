@@ -1,280 +1,241 @@
 /**
- * App.jsx — Queryline root component (Step 5 — Full UI)
+ * App.jsx — Queryline v2 (Gemini-style layout)
  *
- * Layout:
- *   ┌─────────────────────────────────────────────────────┐
- *   │  Top Nav  (QUERYLINE wordmark + sign-in placeholder)│
- *   ├─────────────────────────────────────────────────────┤
- *   │  Console Strip  (persistent terminal prompt)        │
- *   ├──────────┬──────────────────────────────────────────┤
- *   │ History  │  Result card grid                        │
- *   │  Rail    │  (or empty state)                        │
- *   └──────────┴──────────────────────────────────────────┘
+ * ┌───────────────────────────────────────────────────┐
+ * │  Sidebar (fixed left, 260px)                      │
+ * │  ┌─────────────────────────────────────────────┐  │
+ * │  │  Main scrollable content area               │  │
+ * │  │  ┌───────────────────────────────────────┐  │  │
+ * │  │  │  Empty / Result cards (2-col grid)    │  │  │
+ * │  │  └───────────────────────────────────────┘  │  │
+ * │  │  ┌───────────────────────────────────────┐  │  │
+ * │  │  │  Bottom Input Bar (fixed)             │  │  │
+ * │  │  └───────────────────────────────────────┘  │  │
+ * │  └─────────────────────────────────────────────┘  │
+ * └───────────────────────────────────────────────────┘
  */
 import React, { useCallback, useRef, useState } from 'react';
-import ConsoleStrip from './components/ConsoleStrip';
-import HistoryRail  from './components/HistoryRail';
-import ResultCard   from './components/ResultCard';
+import Sidebar    from './components/Sidebar';
+import InputBar   from './components/InputBar';
+import ResultCard from './components/ResultCard';
 
-/* ── Inline styles (no Tailwind needed) ─────────────────────────────────── */
-
-const NAV = {
-  background: 'var(--surface)',
-  borderBottom: '1px solid var(--border-hairline)',
-  padding: '0 1.5rem',
-  height: 48,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  position: 'sticky',
-  top: 0,
-  zIndex: 200,
-};
-
-const WORDMARK = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: '0.95rem',
-  fontWeight: 600,
-  letterSpacing: '0.2em',
-  color: 'var(--accent-amber)',
-  userSelect: 'none',
-};
-
-const BODY = {
-  display: 'flex',
-  gap: '1rem',
-  padding: '1rem 1.25rem',
-  maxWidth: 1300,
-  margin: '0 auto',
-  minHeight: 'calc(100vh - 130px)',
-  alignItems: 'flex-start',
-};
-
-const GRID = {
-  flex: 1,
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))',
-  gap: '1rem',
-  alignContent: 'start',
-};
-
-const EMPTY_STATE = {
-  gridColumn: '1 / -1',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '1rem',
-  padding: '4rem 2rem',
-  color: 'var(--text-muted)',
-  textAlign: 'center',
-};
-
-const SUGGESTION_CHIP = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: '0.75rem',
-  color: 'var(--text-muted)',
-  background: 'var(--surface)',
-  border: '1px solid var(--border-hairline)',
-  borderRadius: 'var(--radius-sm)',
-  padding: '0.4rem 0.85rem',
-  cursor: 'pointer',
-  transition: 'border-color var(--transition-fast), color var(--transition-fast)',
-  display: 'inline-block',
-};
-
-const SUGGESTIONS = [
-  "top 5 products by revenue",
-  "monthly revenue trend this year",
-  "orders by country",
-  "customers by loyalty tier",
-  "average order value by product category",
+const SUGGESTIONS_ALL = [
+  { label: "Top 5 products by revenue", icon: "🏆" },
+  { label: "Monthly revenue trend",     icon: "📈" },
+  { label: "Orders by country",         icon: "🌍" },
+  { label: "Customers by loyalty tier", icon: "⭐" },
+  { label: "Avg order value by category", icon: "💰" },
+  { label: "Products low in stock",     icon: "📦" },
 ];
 
-/* ── Component ───────────────────────────────────────────────────────────── */
-
 export default function App() {
-  const [results,  setResults]  = useState([]);    // array of result objects
+  const [results,  setResults]  = useState([]);
   const [loading,  setLoading]  = useState(false);
-  const [lastSQL,  setLastSQL]  = useState(null);  // for typewriter animation
-  const [error,    setError]    = useState(null);  // toast error message
-  const gridRef = useRef(null);
+  const [lastSQL,  setLastSQL]  = useState(null);
+  const [error,    setError]    = useState(null);
+  const [counter,  setCounter]  = useState(0);
+  const topRef = useRef(null);
 
-  /* ── Send question to backend ─────────────────────────────────────────── */
   const submitQuestion = useCallback(async (question) => {
     if (loading) return;
     setLoading(true);
     setError(null);
-    setLastSQL(null); // reset typewriter
+    setLastSQL(null);
 
     try {
-      const res = await fetch('/api/query', {
+      const res  = await fetch('/api/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question }),
       });
-
       const json = await res.json();
 
       if (!res.ok) {
-        // Surface validation / server errors gracefully
-        setError(json.reason ?? json.error ?? "Can't run that safely. Try rephrasing, or check the schema panel for what's available.");
+        setError(json.reason ?? json.error ?? "Can't run that safely. Try rephrasing.");
         setLoading(false);
         return;
       }
 
       setLastSQL(json.sql);
-      setResults(prev => [json, ...prev]);
-
-      // Scroll result grid into view on mobile
-      setTimeout(() => {
-        gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
+      const id = counter + 1;
+      setCounter(id);
+      setResults(prev => [{ ...json, id, askedAt: json.askedAt ?? new Date().toISOString() }, ...prev]);
+      setTimeout(() => topRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } catch {
-      setError("Connection error. Is the backend running?");
+      setError('Connection error — is the backend running on port 3001?');
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, [loading, counter]);
 
-  /* ── Dismiss error ────────────────────────────────────────────────────── */
-  function dismissError() { setError(null); }
+  function clearAll() {
+    setResults([]);
+    setLastSQL(null);
+    setError(null);
+    setCounter(0);
+  }
+
+  const isEmpty = results.length === 0 && !loading;
 
   return (
-    <>
-      {/* ── Top Nav ──────────────────────────────────────────────────────── */}
-      <nav style={NAV} aria-label="Main navigation">
-        <span style={WORDMARK}>QUERYLINE</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.68rem',
-            color: 'var(--text-muted)',
-            background: 'var(--surface-raised)',
-            border: '1px solid var(--border-hairline)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '2px 8px',
-          }}>v0.5-beta</span>
-          <button
-            id="sign-in-btn"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
-              color: 'var(--text-muted)',
-              border: '1px solid var(--border-hairline)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '4px 12px',
-              background: 'none',
-              cursor: 'pointer',
-              transition: 'color var(--transition-fast), border-color var(--transition-fast)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-amber)'; e.currentTarget.style.borderColor = 'var(--accent-amber)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-hairline)'; }}
-          >
-            sign in
-          </button>
-        </div>
-      </nav>
+    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
 
-      {/* ── Console Strip ─────────────────────────────────────────────────── */}
-      <ConsoleStrip onSubmit={submitQuestion} loading={loading} lastSQL={lastSQL} />
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <Sidebar
+        history={results.map(r => ({ id: r.id, question: r.question, askedAt: r.askedAt }))}
+        onNew={clearAll}
+        onSelect={submitQuestion}
+      />
 
-      {/* ── Error toast ───────────────────────────────────────────────────── */}
-      {error && (
-        <div role="alert" style={{
-          maxWidth: 900,
-          margin: '0.75rem auto',
-          padding: '0.65rem 1rem',
-          background: 'rgba(255,107,107,0.1)',
-          border: '1px solid rgba(255,107,107,0.3)',
-          borderRadius: 'var(--radius-md)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.78rem',
-          color: 'var(--error)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1rem',
-        }}>
-          <span>⚠ {error}</span>
-          <button onClick={dismissError} className="btn-ghost" style={{ color: 'var(--error)', flexShrink: 0 }}>✕</button>
-        </div>
-      )}
+      {/* ── Main area ───────────────────────────────────────────────────── */}
+      <div className="main-content" style={{
+        marginLeft: 260,
+        flex: 1,
+        minHeight: '100vh',
+        paddingBottom: 220, // space for input bar
+        paddingTop: '2rem',
+        paddingLeft: '2rem',
+        paddingRight: '2rem',
+        maxWidth: '100%',
+        position: 'relative',
+      }}>
 
-      {/* ── Main body ─────────────────────────────────────────────────────── */}
-      <div style={BODY}>
-        {/* History rail */}
-        <HistoryRail
-          history={results.map(r => ({ id: r.id, question: r.question, askedAt: r.askedAt }))}
-          onSelect={submitQuestion}
-        />
-
-        {/* Result grid */}
-        <main style={GRID} ref={gridRef} id="result-grid" aria-label="Query results">
-          {results.length === 0 && !loading && (
-            <div style={EMPTY_STATE}>
-              <p style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.85rem',
-                color: 'var(--text-muted)',
-              }}>
-                No questions asked yet.
-              </p>
-              <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                Try one of these:
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', maxWidth: 560 }}>
-                {SUGGESTIONS.map(s => (
-                  <button
-                    key={s}
-                    style={SUGGESTION_CHIP}
-                    onClick={() => submitQuestion(s)}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-amber)'; e.currentTarget.style.color = 'var(--accent-amber)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-hairline)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Loading skeleton card */}
-          {loading && (
+        {/* ── Empty state ─────────────────────────────────────────────── */}
+        {isEmpty && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', minHeight: 'calc(100vh - 260px)',
+            gap: '2rem', textAlign: 'center',
+          }}>
+            {/* Logo mark */}
             <div style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border-hairline)',
-              borderTop: '2px solid var(--accent-amber)',
-              borderRadius: 'var(--radius-md)',
-              padding: '1.25rem',
-              boxShadow: 'var(--shadow-card)',
+              width: 64, height: 64, borderRadius: 20,
+              background: 'var(--grad-brand)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.8rem', fontWeight: 700,
+              fontFamily: 'var(--font-mono)', color: '#000',
+              boxShadow: 'var(--glow-amber)',
+            }}>Q</div>
+
+            <div>
+              <h1 style={{
+                fontSize: '2rem', fontWeight: 600, marginBottom: '0.5rem',
+                background: 'var(--grad-text)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>
+                What do you want to know?
+              </h1>
+              <p style={{ color: 'var(--text-2)', fontSize: '0.95rem' }}>
+                Ask a plain-English question — Queryline generates SQL and charts the answer instantly.
+              </p>
+            </div>
+
+            {/* Suggestion grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '0.75rem', width: '100%', maxWidth: 720,
             }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--accent-amber)' }}>
-                  #{results.length + 1}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  running<span className="cursor-blink" />
-                </span>
-              </div>
-              {/* Skeleton bars */}
-              {[100, 70, 85, 60].map((w, i) => (
-                <div key={i} style={{
-                  height: 8, borderRadius: 4, marginBottom: 10,
-                  background: 'var(--surface-raised)',
-                  width: `${w}%`,
-                  animation: 'none',
-                }} />
+              {SUGGESTIONS_ALL.map(s => (
+                <button
+                  key={s.label}
+                  onClick={() => submitQuestion(s.label)}
+                  style={{
+                    textAlign: 'left',
+                    background: 'var(--glass)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-lg)',
+                    padding: '0.85rem 1rem',
+                    cursor: 'pointer',
+                    transition: 'all var(--t-mid)',
+                    display: 'flex', flexDirection: 'column', gap: '0.35rem',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,180,84,0.4)';
+                    e.currentTarget.style.background = 'var(--surface-hover)';
+                    e.currentTarget.style.boxShadow = 'var(--glow-amber)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.background = 'var(--glass)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>{s.icon}</span>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
+                    {s.label}
+                  </span>
+                </button>
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Actual result cards */}
-          {results.map((r, i) => (
-            <ResultCard key={r.id ?? i} result={r} index={r.id ?? (results.length - i)} />
-          ))}
-        </main>
+        {/* ── Error toast ─────────────────────────────────────────────── */}
+        {error && (
+          <div role="alert" className="fade-in" style={{
+            maxWidth: 760, margin: '0 auto 1rem',
+            padding: '0.75rem 1rem',
+            background: 'rgba(255,100,100,0.08)',
+            border: '1px solid rgba(255,100,100,0.25)',
+            borderRadius: 'var(--r-lg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+            fontSize: '0.82rem', color: '#ff8080',
+          }}>
+            <span>⚠ {error}</span>
+            <button
+              onClick={() => setError(null)}
+              style={{ background: 'none', border: 'none', color: '#ff8080', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+            >✕</button>
+          </div>
+        )}
+
+        {/* ── Loading skeleton ─────────────────────────────────────────── */}
+        {loading && (
+          <div ref={topRef} style={{
+            maxWidth: 760, margin: '0 auto 1rem',
+            background: 'var(--glass)', backdropFilter: 'blur(12px)',
+            border: '1px solid var(--border)', borderRadius: 'var(--r-xl)',
+            overflow: 'hidden', padding: '1.25rem 1.5rem',
+          }}>
+            <div style={{ height: 3, background: 'var(--grad-brand)', marginBottom: '1.25rem', marginLeft: '-1.5rem', marginRight: '-1.5rem', marginTop: '-1.25rem' }} />
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+              <div className="skeleton" style={{ width: 28, height: 14 }} />
+              <div className="skeleton" style={{ width: 60, height: 14 }} />
+            </div>
+            <div className="skeleton" style={{ height: 16, width: '70%', marginBottom: 8 }} />
+            <div className="skeleton" style={{ height: 160, marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div className="skeleton" style={{ height: 12, width: '20%' }} />
+              <div className="skeleton" style={{ height: 12, width: '15%' }} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Result cards ──────────────────────────────────────────────── */}
+        {results.length > 0 && (
+          <div style={{
+            maxWidth: 1100, margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 500px), 1fr))',
+            gap: '1rem',
+          }}>
+            {results.map((r, i) => (
+              <ResultCard key={r.id ?? i} result={r} index={r.id ?? (results.length - i)} />
+            ))}
+          </div>
+        )}
       </div>
-    </>
+
+      {/* ── Bottom input bar ────────────────────────────────────────────── */}
+      <InputBar
+        onSubmit={submitQuestion}
+        loading={loading}
+        lastSQL={lastSQL}
+        onClear={clearAll}
+      />
+    </div>
   );
 }

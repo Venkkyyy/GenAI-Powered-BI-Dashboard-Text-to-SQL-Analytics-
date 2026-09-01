@@ -13,22 +13,23 @@ import {
 } from 'recharts';
 
 const AMBER = '#FFB454';
-const COOL  = '#5EA8FF';
-const CHART_COLORS = [AMBER, COOL, '#a78bfa', '#34d399', '#f87171'];
+const COOL  = '#8ab4f8';
+const CHART_COLORS = ['#FFB454', '#8ab4f8', '#c58af9', '#81c995', '#f87171', '#e8a960'];
 
 const tooltipStyle = {
-  backgroundColor: '#171C27',
-  border: '1px solid #232A38',
-  borderRadius: 4,
-  color: '#E9EDF4',
-  fontFamily: "'IBM Plex Mono', monospace",
-  fontSize: '0.75rem',
+  backgroundColor: 'rgba(18,18,24,0.95)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+  color: '#e8eaed',
+  fontFamily: "'Google Sans Mono', 'Courier New', monospace",
+  fontSize: '0.72rem',
+  backdropFilter: 'blur(8px)',
 };
 
 const axisStyle = {
-  fill: '#7C8698',
-  fontFamily: "'IBM Plex Mono', monospace",
-  fontSize: 11,
+  fill: '#5f6368',
+  fontFamily: "'Google Sans Mono', monospace",
+  fontSize: 10.5,
 };
 
 function truncLabel(v, max = 14) {
